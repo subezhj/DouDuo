@@ -64,7 +64,7 @@ struct DYConversationCell: View {
         .accessibilityHidden(!followsMe)
     }
 
-    @ContentBuilder private var badge: some View {
+    @ViewBuilder private var badge: some View {
         if !row.badge.isEmpty {
             Text(row.badge).font(.caption2.weight(.bold)).foregroundStyle(.white)
                 .padding(.horizontal, 6).padding(.vertical, 2)

@@ -130,6 +130,7 @@ struct DYSearchBackToolbar: ViewModifier {
 
     func body(content: Content) -> some View {
         content.toolbar {
+            #if !NO_IOS27_SDK
             if #available(iOS 27.1, *) {
                 ToolbarItem(placement: .primaryAction) { back }
                     .axisBehavior(.verticalPreferred)
@@ -137,6 +138,9 @@ struct DYSearchBackToolbar: ViewModifier {
             } else {
                 ToolbarItem(placement: .cancellationAction) { back }
             }
+            #else
+            ToolbarItem(placement: .cancellationAction) { back }
+            #endif
         }
     }
 

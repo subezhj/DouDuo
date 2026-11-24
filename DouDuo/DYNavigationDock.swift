@@ -100,10 +100,16 @@ struct DYSystemTabBar: ViewModifier {
     @AppStorage(DDChromeMode.key) private var mode = DDChromeMode.classic.rawValue
     @ViewBuilder func body(content: Content) -> some View {
         if #available(iOS 27.1, *), DDChromeMode.isClassicChrome(mode) {
+            #if !NO_IOS27_SDK
             content.toolbarVisibility(hidden ? .hidden : .visible, for: .tabBar)
                 .toolbarVerticalCompressionBehavior(.prefersToolbarItems)
                 .toolbarBackgroundVisibility(.hidden, for: .bottomBar)
                 .tabBarMinimizeBehavior(.never)
+            #else
+            content.toolbarVisibility(hidden ? .hidden : .visible, for: .tabBar)
+                .toolbarBackgroundVisibility(.hidden, for: .bottomBar)
+                .tabBarMinimizeBehavior(.never)
+            #endif
         } else { content }
     }
 }
@@ -133,7 +139,11 @@ struct DYVideoToolbarActions {
 
 @available(iOS 27.1, *)
 struct DYNativeVideoActions: View {
+    #if !NO_IOS27_SDK
     @Environment(\.toolbarVerticalEdge) private var verticalEdge
+    #else
+    private var verticalEdge: HorizontalEdge? { nil }
+    #endif
     @Environment(\.dyStacksLandscapeComments) private var stacksLandscapeComments
     @Environment(\.dyHingeClosed) private var hingeClosed
     let actions: DYVideoToolbarActions?
@@ -220,6 +230,7 @@ struct DYNativeVideoActions: View {
             }
         }
         .toolbar {
+            #if !NO_IOS27_SDK
             ToolbarItem(placement: .primaryAction) {
                 Group {
                     if let onBack { standaloneControls(onBack) }
@@ -262,6 +273,7 @@ struct DYNativeVideoActions: View {
             .axisBehavior(.verticalPreferred)
             .visibilityPriority(.high)
             .hidden(actions == nil || verticalEdge == nil || isClean)
+            #endif
         }
         // Retain the last measured slot across navigation and sheets.
     }

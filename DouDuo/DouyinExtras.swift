@@ -2991,8 +2991,12 @@ final class DYPagedModelHolder: ObservableObject {
 
 extension ToolbarContent {
     @ToolbarContentBuilder func dyVerticalPreferred() -> some ToolbarContent {
+        #if !NO_IOS27_SDK
         if #available(iOS 27.1, *) { self.axisBehavior(.verticalPreferred) }
         else { self }
+        #else
+        self
+        #endif
     }
 }
 

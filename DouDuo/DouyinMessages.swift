@@ -668,6 +668,7 @@ struct DYMessagesScreen: View {
                         // iOS 27.1+ 简洁/极简：返回 / 分类 / 更多 / 我的 全在自绘右侧栏（messageRail），样式和位置跟视频页右侧栏一致。
                         // 经典模式：系统竖栏本身有 我的/消息/首页 Tab，再画一根栏会叠在同一列 →
                         // 返回、分类、更多改成系统竖栏里的项，由系统跟 Tab 一起排（同视频页经典模式），「我的」用系统 Tab 那个。
+                        #if !NO_IOS27_SDK
                         if #available(iOS 27.1, *), isClassicChrome {
                             if navigation.hasDetail {
                                 ToolbarItem(placement: .primaryAction) { detailBackButton }
@@ -679,6 +680,7 @@ struct DYMessagesScreen: View {
                                 .axisBehavior(.verticalPreferred)
                                 .visibilityPriority(.high)
                         }
+                        #endif
                         if #unavailable(iOS 27.1) {
                             if !navigation.hasDetail && (!DDChromeMode.isClassicChrome(chromeModeRaw) || onClose != nil) {
                                 ToolbarItem(placement: .cancellationAction) { rootBackButton }
@@ -876,7 +878,7 @@ struct DYMessagesScreen: View {
 
     /// Both panes keep their identity while resizing. Explicit widths make the
     /// divider authoritative; ArrangementView treats layout ratios as preferences.
-    @ContentBuilder
+    @ViewBuilder
     private var messageContent: some View {
         if #available(iOS 27.1, *) {
             // 老板定：整个信息界面靠左，右边一条跟视频页同款的右侧栏（内外屏、横竖屏同一套）。
@@ -994,7 +996,7 @@ struct DYMessagesScreen: View {
                 .onChange(of: geo.size, initial: true) { _, size in
                     messageSize = size
                 }
-                .onHingeChange { _, context in isHalfFolded = context.hinge?.status == .partiallyOpen }
+                .modifier(DYMessageHingeObserver(isHalfFolded: $isHalfFolded))
             }
             .modifier(DYEdgeSwipeBack(action: backFromMessage))
         }
@@ -1003,6 +1005,19 @@ struct DYMessagesScreen: View {
     // MARK: 右侧栏（样式、宽度、底部位置照搬视频页右侧栏：54pt 玻璃胶囊、27pt 线框图标、下方小字）
 
     private static let railWidth: CGFloat = 54
+
+    private struct DYMessageHingeObserver: ViewModifier {
+        @Binding var isHalfFolded: Bool
+        func body(content: Content) -> some View {
+            #if !NO_IOS27_SDK
+            if #available(iOS 27.1, *) {
+                content.onHingeChange { _, context in isHalfFolded = context.hinge?.status == .partiallyOpen }
+            } else { content }
+            #else
+            content
+            #endif
+        }
+    }
 
     private var messageRail: some View {
         VStack(spacing: theme.media.actionGroupSpacing) {

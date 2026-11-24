@@ -179,6 +179,10 @@ struct DYFollowMetadataCache {
     private var storedAt: Date?
     private var items: [DYFollowMetadata] = []
 
+    init(ttl: TimeInterval) {
+        self.ttl = ttl
+    }
+
     mutating func store(_ items: [DYFollowMetadata], now: Date) {
         guard !items.isEmpty else { return }
         self.items = items

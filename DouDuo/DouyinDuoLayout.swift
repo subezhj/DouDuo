@@ -14,6 +14,7 @@ enum DYDuoMetrics {
     }
 
     static func hingeSplit(_ geo: GeometryProxy) -> (video: CGRect, panel: CGRect, book: Bool)? {
+        #if !NO_IOS27_SDK
         guard DYDuoMetrics.foldIsActive(geo) else { return nil }
         guard #available(iOS 27.1, *) else { return nil }
         let divisions = geo.reservedRegions(kind: .division).map {
@@ -22,6 +23,9 @@ enum DYDuoMetrics {
         guard let p = DYLiveAdaptiveLayoutEngine.hingePanes(
             bounds: CGRect(origin: .zero, size: geo.size), divisions: divisions) else { return nil }
         return (p.first, p.second, p.book)
+        #else
+        return nil
+        #endif
     }
 
     static func videoCommentPanes(_ geo: GeometryProxy) -> (video: CGRect, panel: CGRect, book: Bool)? {
@@ -33,6 +37,7 @@ enum DYDuoMetrics {
 
     /// 窗格右侧被系统遮挡区（状态栏时间/信号）占掉的宽度，最多让 120pt。
     static func trailingOcclusionInset(_ geo: GeometryProxy, pane: CGRect) -> CGFloat {
+        #if !NO_IOS27_SDK
         guard #available(iOS 27.1, *) else { return 0 }
         var inset: CGFloat = 0
         for region in geo.reservedRegions(kind: .occlusion) where region.isActive {
@@ -41,6 +46,9 @@ enum DYDuoMetrics {
             inset = max(inset, pane.maxX - f.minX)
         }
         return min(max(0, inset), 120)
+        #else
+        return 0
+        #endif
     }
 
 
@@ -121,15 +129,18 @@ enum DYDuoMetrics {
         // 演示/截图用：模拟器没有物理折痕，用环境变量强制进入半折叠布局
         if ProcessInfo.processInfo.environment["DOUDUO_FOLD"] == "1" { return true }
         #endif
+        #if !NO_IOS27_SDK
         if #available(iOS 27.1, *) {
             return canUseFoldLayout && proxy.reservedRegions(kind: .division).contains { $0.isActive }
         }
+        #endif
         return false
     }
 
     /// 顶栏左移量：合屏时前摄挖孔压在右上，整排往左让出它的宽度，避免「推荐/直播」被啃掉。
     /// 只认靠上且靠右的 occlusion；下方/居中的（如外屏下缘）不动顶栏。
     static func topBarLeftShift(_ proxy: GeometryProxy) -> CGFloat {
+        #if !NO_IOS27_SDK
         guard #available(iOS 27.1, *) else { return 0 }
         let w = proxy.size.width
         var shift: CGFloat = 0
@@ -142,6 +153,9 @@ enum DYDuoMetrics {
             }
         }
         return min(shift, 56)
+        #else
+        return 0
+        #endif
     }
 }
 
@@ -278,7 +292,11 @@ struct DYAdaptiveActionRail<Content: View>: View {
 
 @available(iOS 27.1, *)
 private struct DYSystemActionRail<Content: View>: View {
+    #if !NO_IOS27_SDK
     @Environment(\.toolbarVerticalEdge) private var systemEdge
+    #else
+    private var systemEdge: HorizontalEdge? { nil }
+    #endif
     @ViewBuilder var content: (HorizontalEdge) -> Content
 
     private var edge: HorizontalEdge {
@@ -337,6 +355,7 @@ enum DYReservedNudge {
     /// 在视图自己的坐标里，把和遮挡区相交的部分挪到最近的一侧。摄像头优先向下，符合外屏「小幅下移」。
     static func offset(in proxy: GeometryProxy, railEdge: HorizontalEdge? = nil,
                        layoutDirection: LayoutDirection = .leftToRight, verticalSpace: ClosedRange<CGFloat>? = nil) -> CGSize {
+        #if !NO_IOS27_SDK
         let local = CGRect(origin: .zero, size: proxy.size)
         guard local.width > 1, local.height > 1 else { return .zero }
         var box = local
@@ -354,6 +373,9 @@ enum DYReservedNudge {
             box = box.offsetBy(dx: d.width, dy: d.height)
         }
         return acc
+        #else
+        return .zero
+        #endif
     }
 
     private static func clear(_ box: CGRect, _ region: CGRect, preferDown: Bool,
@@ -532,11 +554,15 @@ extension View {
 
     @ViewBuilder
     func dyCommentStatusVisibility(hidden: Bool) -> some View {
+        #if !NO_IOS27_SDK
         if #available(iOS 27.0, *) {
             toolbarVisibility(hidden ? .hidden : .automatic, for: .statusBar)
         } else {
             self
         }
+        #else
+        self
+        #endif
     }
 }
 
@@ -545,6 +571,7 @@ struct DYCommentBarPolicy: ViewModifier {
     let usesHorizontalStatus: Bool
 
     @ViewBuilder func body(content: Content) -> some View {
+        #if !NO_IOS27_SDK
         if #available(iOS 27.1, *) {
             content
                 .toolbarVerticalBehavior(usesHorizontalStatus || hidesStatus ? .disabled : .automatic)
@@ -552,6 +579,9 @@ struct DYCommentBarPolicy: ViewModifier {
         } else {
             content
         }
+        #else
+        content
+        #endif
     }
 }
 
@@ -871,8 +901,12 @@ struct DYCommentPlayerLayout<Video: View>: View {
 
 extension View {
     @ViewBuilder func dyDisableVerticalToolbar() -> some View {
+        #if !NO_IOS27_SDK
         if #available(iOS 27.1, *) { self.toolbarVerticalBehavior(.disabled) }
         else { self }
+        #else
+        self
+        #endif
     }
     @ViewBuilder func dyPanelGlass<S: Shape>(in shape: S) -> some View {
         if #available(iOS 26.0, *) { self.glassEffect(.regular, in: shape) }
@@ -884,11 +918,18 @@ private struct DYStandaloneBarPolicy: ViewModifier {
     let classic: Bool
     @ViewBuilder func body(content: Content) -> some View {
         if #available(iOS 27.1, *), classic {
+            #if !NO_IOS27_SDK
             content.toolbarVisibility(.hidden, for: .tabBar)
                 .toolbarVisibility(.visible, for: .navigationBar)
                 .toolbarVerticalCompressionBehavior(.prefersToolbarItems)
                 .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
                 .toolbarColorScheme(.dark, for: .navigationBar, .bottomBar)
+            #else
+            content.toolbarVisibility(.hidden, for: .tabBar)
+                .toolbarVisibility(.visible, for: .navigationBar)
+                .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
+                .toolbarColorScheme(.dark, for: .navigationBar, .bottomBar)
+            #endif
         } else {
             content.toolbar(.hidden, for: .navigationBar)
         }
@@ -949,14 +990,31 @@ struct DYHingeStateRoot: ViewModifier {
                     let height = geo.size.height + insets.top + insets.bottom
                     return width < DYDuoMetrics.legacyWideMin || width < height
                 } action: { compactWindow = $0 }
-                .onHingeChange { _, context in
-                    closed = context.hinge?.status == .closed
-                    fullyOpen = context.hinge?.status == .fullyOpen
-                    DYLiveModel.log("DDHINGE root status=\(String(describing: context.hinge?.status))")
+                .dyObserveHinge { isClosed, isFullyOpen in
+                    closed = isClosed
+                    fullyOpen = isFullyOpen
                 }
         } else {
             content
         }
+    }
+}
+
+private extension View {
+    @ViewBuilder
+    func dyObserveHinge(_ onChange: @escaping (Bool, Bool) -> Void) -> some View {
+        #if !NO_IOS27_SDK
+        if #available(iOS 27.1, *) {
+            self.onHingeChange { _, context in
+                onChange(context.hinge?.status == .closed, context.hinge?.status == .fullyOpen)
+                DYLiveModel.log("DDHINGE root status=\(String(describing: context.hinge?.status))")
+            }
+        } else {
+            self
+        }
+        #else
+        self
+        #endif
     }
 }
 

@@ -1726,6 +1726,21 @@ extension EnvironmentValues {
     @Entry var duoCleanScreen = false
 }
 
+private extension View {
+    @ViewBuilder
+    func dyDisableNavMinimization() -> some View {
+        #if !NO_IOS27_SDK
+        if #available(iOS 27.1, *) {
+            self.toolbarMinimizationBehavior(.never, for: .navigationBar)
+        } else {
+            self
+        }
+        #else
+        self
+        #endif
+    }
+}
+
 
 struct DYUpstreamFeedScreen: DYRecommendFeedHost {
     init(bridge: DouyinBridge, feed: DYFeedModel) {
@@ -3494,7 +3509,7 @@ struct DYClassicFeedScreen: DYRecommendFeedHost {
                     .toolbarVisibility(liveRoomOpen || !DYDuoMetrics.isDuoHardware ? .hidden : .visible, for: .navigationBar)
                     .toolbarBackgroundVisibility(.hidden, for: .navigationBar, .bottomBar)
                     .toolbarColorScheme(.dark, for: .navigationBar, .bottomBar)
-                    .toolbarMinimizationBehavior(.never, for: .navigationBar)
+                    .dyDisableNavMinimization()
                     .scrollEdgeEffectHidden(true, for: .all)
                     // Hide the underlying native selector for compact
                     // sheets too, so dismissing comments does not restore
@@ -4485,7 +4500,11 @@ struct DYClassicVideoPage: View {
     private var usesOfflineFile: Bool { offlinePlayback?.inLibrary == true }
     @Environment(\.duoCleanScreen) private var cleanScreen
     @Environment(\.duoSystemBars) private var systemBars
+    #if !NO_IOS27_SDK
     @Environment(\.toolbarVerticalEdge) private var verticalBarEdge
+    #else
+    private var verticalBarEdge: HorizontalEdge? { nil }
+    #endif
     @Environment(\.duoInlineVideoNavigation) private var inlineNavigation
     @Environment(\.dyStacksLandscapeComments) private var stacksLandscapeComments
     @Environment(\.dyHingeClosed) private var hingeClosed
@@ -4611,62 +4630,64 @@ struct DYClassicVideoPage: View {
         self.onChannelDragEnd = onChannelDragEnd
     }
 
+    private var playerTopInset: CGFloat {
+        isCompactPhone ? max(insets.top, DYDuoMetrics.windowSafeTop) + 52 : insets.top
+    }
+
+    @ViewBuilder
+    private func mediaContent(_ fg: Color) -> some View {
+        if item.images.isEmpty,
+           let source = usesOfflineFile ? offlinePlayback?.localURL() : item.play.flatMap(URL.init(string:)) {
+            let url = usesOfflineFile ? source : (DYVideoCache.localURL(item.id) ?? source)
+            PlayerPage.external(id: item.id, title: item.desc, url: url, durationSec: item.duration,
+                                isActive: isCurrent, topInset: playerTopInset, bottomInset: mediaBottomInset,
+                                resumePosition: resume, compactChrome: true,
+                                preparedPlayer: usesOfflineFile ? nil : { preloader.take(item.id) },
+                                returnPlayer: usesOfflineFile ? nil : { preloader.giveBack(item.id, $0) },
+                                onEnded: autoNext ? onEnded : nil,
+                                onDoubleTap: {
+                                    onDoubleTap()
+                                    heart = true
+                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { heart = false }
+                                },
+                                onSavePosition: onSavePosition, onClose: {}, fillWidth: autoFit,
+                                onFillWidthChange: { autoFit = $0 },
+                                danmaku: danmakuOn ? dm.items : [],
+                                altURL: usesOfflineFile ? nil : source,
+                                quality: item.q,
+                                fastURL: usesOfflineFile ? nil : item.playFast.flatMap(URL.init(string:)),
+                                posterURL: usesOfflineFile ? nil : item.cover.flatMap(URL.init(string:)),
+                                videoAspect: item.videoAspect,
+                                headEndSeconds: nil,
+                                continuationURL: nil,
+                                onSwipeLeft: onChannelDrag == nil && !cleanScreen ? { (onNavigateLeft ?? onAuthor)() } : nil,
+                                onSwipeRight: onChannelDrag == nil && !cleanScreen ? { onShowFollowing?() } : nil,
+                                onContextMenu: { if !cleanScreen { showOptions = true } },
+                                boost: boost,
+                                onHorizontalDrag: cleanScreen ? nil : onChannelDrag,
+                                onHorizontalDragEnd: cleanScreen ? nil : onChannelDragEnd)
+                .environment(\.duoContentInsets, contentInsets)
+                .environment(\.dyUsesClassicVideoLayout, true)
+        } else if usesOfflineFile {
+            ContentUnavailableView("这个离线视频已移除", systemImage: "airplane")
+        } else {
+            DYImageGallery(images: item.images,
+                           musicURL: item.musicURL.flatMap(URL.init(string:)),
+                           isActive: isCurrent,
+                           muted: DYGalleryAudio.globalMuted,
+                           hidesIndex: cleanScreen,
+                           onDoubleTap: {
+                               onDoubleTap()
+                               heart = true
+                               DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { heart = false }
+                           })
+        }
+    }
+
     var body: some View {
         let fg = theme.media.onMedia.color(for: scheme)
         ZStack(alignment: .bottomLeading) {
-            if item.images.isEmpty,
-               let source = usesOfflineFile ? offlinePlayback?.localURL() : item.play.flatMap(URL.init(string:)) {
-                // 只用「整条缓存」或「在线流」：不再走头部缓存 + 接续（那一下切换必然闪/卡）
-                // 注意：不要拿「预存的第一段」起播——半截 MP4 的样本表指向文件尾，
-                // AVFoundation 会直接报 -11828（实测长横屏视频因此黑屏 14–28 秒）。
-                // 长视频：整条缓存好了本地播，没缓存好就走重定向地址流播（1–2 秒起播）。
-                let url = usesOfflineFile ? source : (DYVideoCache.localURL(item.id) ?? source)
-                let playerTopInset = isCompactPhone ? max(insets.top, DYDuoMetrics.windowSafeTop) + 52 : insets.top
-                // 复用播放器：左右切换作者/关注、双击点赞、分区长按、竖滑切视频、底部拖动进度及 VLC 兜底
-                PlayerPage.external(id: item.id, title: item.desc, url: url, durationSec: item.duration,
-                                    isActive: isCurrent, topInset: playerTopInset, bottomInset: mediaBottomInset,
-                                    resumePosition: resume, compactChrome: true,
-                                    preparedPlayer: usesOfflineFile ? nil : { preloader.take(item.id) },
-                                    returnPlayer: usesOfflineFile ? nil : { preloader.giveBack(item.id, $0) },
-                                    onEnded: autoNext ? onEnded : nil,
-                                    onDoubleTap: {
-                                        onDoubleTap()
-                                        heart = true
-                                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { heart = false }
-                                    },
-                                    onSavePosition: onSavePosition, onClose: {}, fillWidth: autoFit,
-                                    onFillWidthChange: { autoFit = $0 },
-                                    danmaku: danmakuOn ? dm.items : [],
-                                    altURL: usesOfflineFile ? nil : source,
-                                    quality: item.q,
-                                    fastURL: usesOfflineFile ? nil : item.playFast.flatMap(URL.init(string:)),
-                                    posterURL: usesOfflineFile ? nil : item.cover.flatMap(URL.init(string:)),
-                                    videoAspect: item.videoAspect,
-                                    headEndSeconds: nil,
-                                    continuationURL: nil,
-                                    onSwipeLeft: onChannelDrag == nil && !cleanScreen ? { (onNavigateLeft ?? onAuthor)() } : nil,
-                                    onSwipeRight: onChannelDrag == nil && !cleanScreen ? { onShowFollowing?() } : nil,
-                                    onContextMenu: { if !cleanScreen { showOptions = true } },
-                                    boost: boost,
-                                    onHorizontalDrag: cleanScreen ? nil : onChannelDrag,
-                                    onHorizontalDragEnd: cleanScreen ? nil : onChannelDragEnd)
-                    .environment(\.duoContentInsets, contentInsets)
-                    .environment(\.dyUsesClassicVideoLayout, true)
-            } else if usesOfflineFile {
-                ContentUnavailableView("这个离线视频已移除", systemImage: "airplane")
-            } else {
-                // 图集也要有背景音乐（原来只翻图、没声音）
-                DYImageGallery(images: item.images,
-                               musicURL: item.musicURL.flatMap(URL.init(string:)),
-                               isActive: isCurrent,
-                               muted: DYGalleryAudio.globalMuted,
-                               hidesIndex: cleanScreen,
-                               onDoubleTap: {
-                                   onDoubleTap()
-                                   heart = true
-                                   DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { heart = false }
-                               })
-            }
+            mediaContent(fg)
 
             if heart && !cleanScreen {
                 Image(systemName: "heart.fill")

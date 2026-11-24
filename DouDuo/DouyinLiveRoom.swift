@@ -968,6 +968,7 @@ private let ddLiveCategories: [DYLiveCategory] = [
     .init(id: "exercise", name: "运动", kind: .partition(.init(id: "108", type: "4", name: "运动"))),
 ]
 
+#if !NO_IOS27_SDK
 @available(iOS 27.1, *)
 private func dyLiveHingeStatus(_ hinge: DeviceHinge?) -> DYLiveHingeStatus {
     guard let hinge else { return .unsupported }
@@ -976,15 +977,20 @@ private func dyLiveHingeStatus(_ hinge: DeviceHinge?) -> DYLiveHingeStatus {
     if hinge.status == .fullyOpen { return .fullyOpen }
     return .unsupported
 }
+#endif
 
 private extension View {
     @ViewBuilder
     func onLiveHingeChange(_ apply: @escaping (DYLiveHingeStatus) -> Void) -> some View {
+        #if !NO_IOS27_SDK
         if #available(iOS 27.1, *) {
             onHingeChange { _, context in apply(dyLiveHingeStatus(context.hinge)) }
         } else {
             self
         }
+        #else
+        self
+        #endif
     }
 
     func placed(in pane: CGRect) -> some View {
@@ -1387,10 +1393,14 @@ struct DYLiveFeed: View {
     }
 
     private func liveDivisions(in geo: GeometryProxy) -> [DYLiveDivision] {
+        #if !NO_IOS27_SDK
         guard #available(iOS 27.1, *) else { return [] }
         return geo.reservedRegions(kind: .division).map {
             DYLiveDivision(frame: $0.frame, isActive: $0.isActive)
         }
+        #else
+        return []
+        #endif
     }
 
     /// 「更多」里的分屏/整屏：内屏完全展开时随时可点；半折叠沿用原来的资格判断；其余（外屏/普通手机）灰掉。
@@ -1444,11 +1454,13 @@ struct DYLiveFeed: View {
         let trailing = DYLivePreviewChrome.horizontalInset(inset(geo.safeAreaInsets.trailing, screenInsets.trailing))
         let divisions = previewDivisions(in: geo)
         var regions = divisions
+        #if !NO_IOS27_SDK
         if #available(iOS 27.1, *) {
             for region in geo.reservedRegions(kind: .occlusion) where region.isActive {
                 regions.append(region.frame)
             }
         }
+        #endif
         let fitted = DYLivePreviewChrome.containedInsets(
             pane: pane, top: top, leading: leading, trailing: trailing, regions: regions)
         let strip = DYLivePreviewChrome.avatarStripInsets(
@@ -1458,12 +1470,16 @@ struct DYLiveFeed: View {
     }
 
     private func previewDivisions(in geo: GeometryProxy) -> [CGRect] {
+        #if !NO_IOS27_SDK
         guard #available(iOS 27.1, *) else { return [] }
         var frames: [CGRect] = []
         for region in geo.reservedRegions(kind: .division) where region.isActive {
             frames.append(region.frame)
         }
         return frames
+        #else
+        return []
+        #endif
     }
 
     private func inset(_ local: CGFloat, _ passed: CGFloat) -> CGFloat {
