@@ -11,7 +11,7 @@ struct DYMessageLayoutProbe: View {
 
     var body: some View {
         Group {
-            if mode == DDChromeMode.duoClassic.rawValue {
+            if DDChromeMode.isClassicChrome(mode) {
                 classicTabs
             } else {
                 DYMessagesScreen(bridge: bridge, onClose: {}, onMine: {}, onWeb: { _ in })

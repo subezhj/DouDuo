@@ -596,7 +596,7 @@ struct DYMessagesScreen: View {
     @State private var shareOpenFailed = false
     @State private var shareOpenAttempt = 0
     @State private var handledShareRequest = ""
-    private var keepsSharedChatDock: Bool { openedFromShare && chromeModeRaw == DDChromeMode.duoClassic.rawValue }
+    private var keepsSharedChatDock: Bool { openedFromShare && DDChromeMode.isClassicChrome(chromeModeRaw) }
     private var compactSidebar: Bool { sidebarVisible && sidebarWidth < 250 }
     @Environment(\.appTheme) private var theme
     @Environment(\.colorScheme) private var scheme
@@ -680,7 +680,7 @@ struct DYMessagesScreen: View {
                                 .visibilityPriority(.high)
                         }
                         if #unavailable(iOS 27.1) {
-                            if !navigation.hasDetail && (chromeModeRaw != DDChromeMode.duoClassic.rawValue || onClose != nil) {
+                            if !navigation.hasDetail && (!DDChromeMode.isClassicChrome(chromeModeRaw) || onClose != nil) {
                                 ToolbarItem(placement: .cancellationAction) { rootBackButton }
                             }
                             if navigation.hasDetail {
@@ -1007,7 +1007,7 @@ struct DYMessagesScreen: View {
     private var messageRail: some View {
         VStack(spacing: theme.media.actionGroupSpacing) {
             // 返回：单独一颗圆（跟视频页从搜索进入时的返回圆钮一致）
-            if (!showingMine && navigation.hasDetail) || chromeModeRaw != DDChromeMode.duoClassic.rawValue || onClose != nil {
+            if (!showingMine && navigation.hasDetail) || !DDChromeMode.isClassicChrome(chromeModeRaw) || onClose != nil {
                 Button {
                     // 信息、我的是并列两页：返回只退当前页里的上一层，到顶就关掉整页回视频（不再「我的 → 返回 → 信息」）
                     if !showingMine && navigation.hasDetail { backFromMessage() }
@@ -1052,7 +1052,7 @@ struct DYMessagesScreen: View {
                 .frame(width: Self.railWidth, height: 48 * 4 + theme.media.actionItemSpacing * 3 + 16)
             }
             // 我的：直接进「我的」
-            if mineContent != nil || (onMine != nil && chromeModeRaw != DDChromeMode.duoClassic.rawValue) {
+            if mineContent != nil || (onMine != nil && !DDChromeMode.isClassicChrome(chromeModeRaw)) {
                 VStack(spacing: theme.media.actionItemSpacing) {
                     railButton(icon: "bubble.left.and.bubble.right", title: "信息", selected: !showingMine, badge: 0,
                                dot: showingMine && unreadTotal > 0,
@@ -1760,7 +1760,7 @@ struct DYMessagesScreen: View {
         .buttonStyle(.plain)
     }
 
-    private var isClassicChrome: Bool { chromeModeRaw == DDChromeMode.duoClassic.rawValue }
+    private var isClassicChrome: Bool { DDChromeMode.isClassicChrome(chromeModeRaw) }
 
     /// 经典模式：系统竖栏里的分类胶囊（图标+文字，同视频页玻璃胶囊），聊天时多一个「更多」
     private var classicCategoryCapsule: some View {
@@ -3163,7 +3163,7 @@ struct DYEdgeSwipeBack: ViewModifier {
 struct DYForwardScreen: View {
     @AppStorage(DDChromeMode.key) private var mode = DDChromeMode.classic.rawValue
     private var usesClassicLayout: Bool {
-        if #available(iOS 27.1, *) { return mode == DDChromeMode.duoClassic.rawValue }
+        if #available(iOS 27.1, *) { return DDChromeMode.isClassicChrome(mode) }
         return false
     }
     let item: DYAweme

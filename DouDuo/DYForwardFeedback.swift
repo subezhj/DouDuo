@@ -105,11 +105,11 @@ struct DYForwardSuccessBanner: View {
         .padding(.horizontal, 14).padding(.vertical, 10)
         .foregroundStyle(.white)
         .background {
-            if mode != DDChromeMode.duoClassic.rawValue {
+            if !DDChromeMode.isClassicChrome(mode) {
                 RoundedRectangle(cornerRadius: 18).fill(Color(uiColor: .secondarySystemBackground))
             }
         }
-        .glassEffect(mode == DDChromeMode.duoClassic.rawValue ? .regular : .identity, in: .rect(cornerRadius: 18))
+        .glassEffect(DDChromeMode.isClassicChrome(mode) ? .regular : .identity, in: .rect(cornerRadius: 18))
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("douyin.forward.success")
         .accessibilityAction(.escape, onClose)

@@ -2832,16 +2832,35 @@ struct DDClassicTopInset: ViewModifier {
 /// - rail 简洁：页签收进右侧功能栏的圆形模块入口，搜索进该入口的菜单
 /// - minimal 极简：同简洁，并且隐藏作者和标题
 enum DDChromeMode: String, CaseIterable, Identifiable {
-    case classic, rail, minimal, duoClassic
+    case classic, rail, minimal, duoClassic, iphoneCompact
     static let key = "douyin_chrome_mode_v1"
     var id: String { rawValue }
     var title: String {
-        switch self { case .classic: "默认"; case .rail: "简洁"; case .minimal: "极简"; case .duoClassic: "经典" }
+        switch self {
+        case .classic: "默认"
+        case .rail: "简洁"
+        case .minimal: "极简"
+        case .duoClassic: "经典"
+        case .iphoneCompact: "直板"
+        }
     }
     var symbol: String {
-        switch self { case .classic: "rectangle.topthird.inset.filled"; case .rail: "sidebar.right"; case .minimal: "rectangle"; case .duoClassic: "play.rectangle.on.rectangle" }
+        switch self {
+        case .classic: "rectangle.topthird.inset.filled"
+        case .rail: "sidebar.right"
+        case .minimal: "rectangle"
+        case .duoClassic: "play.rectangle.on.rectangle"
+        case .iphoneCompact: "iphone"
+        }
     }
     var usesRail: Bool { self == .rail || self == .minimal }
+    var usesClassicChrome: Bool { self == .duoClassic || self == .iphoneCompact }
+    static func isClassicChrome(_ raw: String) -> Bool {
+        raw == DDChromeMode.duoClassic.rawValue || raw == DDChromeMode.iphoneCompact.rawValue
+    }
+    static func isCompactPhone(_ raw: String) -> Bool {
+        raw == DDChromeMode.iphoneCompact.rawValue
+    }
     static var availableCases: [Self] {
         if #available(iOS 27.1, *) { return allCases }
         return [.classic, .rail, .minimal]
@@ -2989,7 +3008,7 @@ struct DYVideoPage: View {
 
     var body: some View {
         Group {
-            if #available(iOS 27.1, *), chromeModeRaw == DDChromeMode.duoClassic.rawValue {
+            if #available(iOS 27.1, *), DDChromeMode.isClassicChrome(chromeModeRaw) {
                 DYClassicVideoPage(item: item, isCurrent: isCurrent && !searchCoversVideo && !filterPresented, insets: insets, resume: resume,
                     liked: liked, collected: collected, onLike: onLike, onCollect: onCollect,
                     onDoubleTap: onDoubleTap, onComments: onComments, onAuthor: onAuthor,
@@ -3022,7 +3041,7 @@ struct DouyinFeedScreen: View {
     @StateObject private var shared = DYFeedShared()
     var body: some View {
         Group {
-            if #available(iOS 27.1, *), chromeModeRaw == DDChromeMode.duoClassic.rawValue {
+            if #available(iOS 27.1, *), DDChromeMode.isClassicChrome(chromeModeRaw) {
                 DYClassicFeedScreen(bridge: shared.bridge, feed: shared.feed)
             } else {
                 DYUpstreamFeedScreen(bridge: shared.bridge, feed: shared.feed)
@@ -3154,6 +3173,8 @@ struct DYClassicFeedScreen: DYRecommendFeedHost {
     private var overlayOpen: Bool { hashtagFilterPresented || (showSearch && (!searchIsSplit || searchSession?.presentsVideo == true)) || showMine || showMessages || authorWorkOpen || (authorTarget != nil && !supportsSidePanel) }
     /// 全局播放速度；长按临时倍速不修改持久化偏好。
     @AppStorage("douyin_playback_rate_v1") private var playbackRate = 1.0
+    @AppStorage(DDChromeMode.key) private var chromeModeRaw = DDChromeMode.classic.rawValue
+    private var isCompactPhone: Bool { DDChromeMode.isCompactPhone(chromeModeRaw) }
     @State var noticeUnread = 0
     @State private var wideToken = UUID()
     @State private var topChrome = CGRect.zero
@@ -3425,59 +3446,77 @@ struct DYClassicFeedScreen: DYRecommendFeedHost {
         .modifier(DDReleaseNotesModifier())
     }
 
+    private var mineTab: some TabContent<DYMainTab> {
+        Tab("我的", systemImage: "person.crop.circle", value: DYMainTab.mine) {
+            DYMineScreen(bridge: bridge,
+                         onLogin: { reloadAfterLogin() },
+                         onAuthor: { item in
+                             mainTab = .home
+                             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { authorTarget = item.author }
+                         },
+                         onMessages: { mainTab = .messages })
+                .tint(nil)
+        }
+    }
+
+    private var messagesTab: some TabContent<DYMainTab> {
+        Tab("消息", systemImage: "bubble.left.and.bubble.right", value: DYMainTab.messages) {
+            DYMessagesScreen(bridge: bridge, onMine: { mainTab = .mine }, onWeb: { url in
+                mainTab = .home
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { web = DYWebTarget(url: url) }
+            }, forwardedShare: forwardedChat)
+            .tint(nil)
+        }
+        .badge(noticeUnread)
+    }
+
+    private var homeTab: some TabContent<DYMainTab> {
+        Tab("首页", systemImage: "house", value: DYMainTab.home) {
+            NavigationStack {
+                layoutRoot
+                    .background { DYHomeReselectionGuard(onDoubleTap: { tapChannel(.recommend) }).allowsHitTesting(false) }
+                    .ignoresSafeArea(.container, edges: presentsLandscapeComments ? [.top, .horizontal]
+                                     : hidesCommentStatus ? .horizontal : [])
+                    .coordinateSpace(.named("douduo.feed"))
+                    .environment(\.duoSystemBars, true)
+                    .environment(\.duoInlineVideoNavigation, sidePanelOpen || hidesCommentStatus)
+                    .environment(\.duoVisibleVideo, $visibleVideo)
+                    .environment(\.duoCleanScreen, cleanScreen)
+                    .overlayPreferenceValue(DYActiveVideoActionsKey.self) { actions in
+                        DYNativeVideoActions(actions: hidesVideoChrome ? nil : actions,
+                                             isClean: cleanScreen,
+                                             onToggleClean: { cleanScreen.toggle() },
+                                             inlineTopInset: headerTopInset)
+                            .id(horizontalCommentStatus || hidesCommentStatus)
+                    }
+                    // Non-folding devices use the custom header. An empty native
+                    // navigation bar would intercept its taps and cover Search.
+                    .toolbarVisibility(liveRoomOpen || !DYDuoMetrics.isDuoHardware ? .hidden : .visible, for: .navigationBar)
+                    .toolbarBackgroundVisibility(.hidden, for: .navigationBar, .bottomBar)
+                    .toolbarColorScheme(.dark, for: .navigationBar, .bottomBar)
+                    .toolbarMinimizationBehavior(.never, for: .navigationBar)
+                    .scrollEdgeEffectHidden(true, for: .all)
+                    // Hide the underlying native selector for compact
+                    // sheets too, so dismissing comments does not restore
+                    // a previously expanded tab picker over the video rail.
+                    .modifier(DYSystemTabBar(hidden: hidesVideoChrome || cleanScreen))
+                    .modifier(DYCommentBarPolicy(hidesStatus: hidesCommentStatus,
+                                                 usesHorizontalStatus: horizontalCommentStatus))
+            }
+            .tint(nil)
+        }
+    }
+
     private var systemTabs: some View {
         TabView(selection: Binding(get: { mainTab }, set: { mainTab = $0 })) {
-            Tab("我的", systemImage: "person.crop.circle", value: DYMainTab.mine) {
-                DYMineScreen(bridge: bridge,
-                             onLogin: { reloadAfterLogin() },
-                             onAuthor: { item in
-                                 mainTab = .home
-                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { authorTarget = item.author }
-                             },
-                             onMessages: { mainTab = .messages })
-                    .tint(nil)
-            }
-            Tab("消息", systemImage: "bubble.left.and.bubble.right", value: DYMainTab.messages) {
-                DYMessagesScreen(bridge: bridge, onMine: { mainTab = .mine }, onWeb: { url in
-                    mainTab = .home
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { web = DYWebTarget(url: url) }
-                }, forwardedShare: forwardedChat)
-                .tint(nil)
-            }
-            .badge(noticeUnread)
-            Tab("首页", systemImage: "house", value: DYMainTab.home) {
-                NavigationStack {
-                    layoutRoot
-                        .background { DYHomeReselectionGuard(onDoubleTap: { tapChannel(.recommend) }).allowsHitTesting(false) }
-                        .ignoresSafeArea(.container, edges: presentsLandscapeComments ? [.top, .horizontal]
-                                         : hidesCommentStatus ? .horizontal : [])
-                        .coordinateSpace(.named("douduo.feed"))
-                        .environment(\.duoSystemBars, true)
-                        .environment(\.duoInlineVideoNavigation, sidePanelOpen || hidesCommentStatus)
-                        .environment(\.duoVisibleVideo, $visibleVideo)
-                        .environment(\.duoCleanScreen, cleanScreen)
-                        .overlayPreferenceValue(DYActiveVideoActionsKey.self) { actions in
-                            DYNativeVideoActions(actions: hidesVideoChrome ? nil : actions,
-                                                 isClean: cleanScreen,
-                                                 onToggleClean: { cleanScreen.toggle() },
-                                                 inlineTopInset: headerTopInset)
-                                .id(horizontalCommentStatus || hidesCommentStatus)
-                        }
-                        // Non-folding devices use the custom header. An empty native
-                        // navigation bar would intercept its taps and cover Search.
-                        .toolbarVisibility(liveRoomOpen || !DYDuoMetrics.isDuoHardware ? .hidden : .visible, for: .navigationBar)
-                        .toolbarBackgroundVisibility(.hidden, for: .navigationBar, .bottomBar)
-                        .toolbarColorScheme(.dark, for: .navigationBar, .bottomBar)
-                        .toolbarMinimizationBehavior(.never, for: .navigationBar)
-                        .scrollEdgeEffectHidden(true, for: .all)
-                        // Hide the underlying native selector for compact
-                        // sheets too, so dismissing comments does not restore
-                        // a previously expanded tab picker over the video rail.
-                        .modifier(DYSystemTabBar(hidden: hidesVideoChrome || cleanScreen))
-                        .modifier(DYCommentBarPolicy(hidesStatus: hidesCommentStatus,
-                                                     usesHorizontalStatus: horizontalCommentStatus))
-                }
-                .tint(nil)
+            if isCompactPhone {
+                homeTab
+                messagesTab
+                mineTab
+            } else {
+                mineTab
+                messagesTab
+                homeTab
             }
         }
         .environment(\.dyForwardOpenChat, { receipt in
@@ -3949,6 +3988,12 @@ struct DYClassicFeedScreen: DYRecommendFeedHost {
     @ViewBuilder
     private var moreExtrasMenu: some View {
         Section {
+            if isCompactPhone {
+                Toggle(isOn: $cleanScreen) {
+                    Label(cleanScreen ? "退出清屏" : "清屏", systemImage: cleanScreen ? "eye" : "eye.slash")
+                }
+                .accessibilityIdentifier("douyin.quick.clean")
+            }
             if DYVideoFit.showsLabeledControl(on: .classicMore) {
                 Toggle(isOn: $autoFit) {
                     Label(DYVideoFit.title, systemImage: "arrow.up.left.and.arrow.down.right")
@@ -4448,11 +4493,14 @@ struct DYClassicVideoPage: View {
     @Environment(\.duoVisibleVideo) private var visibleVideo
     @Environment(\.horizontalSizeClass) private var hSize
     @Environment(\.verticalSizeClass) private var vSize
+    @AppStorage(DDChromeMode.key) private var chromeModeRaw = DDChromeMode.classic.rawValue
+    private var isCompactPhone: Bool { DDChromeMode.isCompactPhone(chromeModeRaw) }
     private var lowersActionRail: Bool {
-        systemBars && ((stacksLandscapeComments && !hingeClosed)
+        if isCompactPhone { return systemBars && vSize == .regular }
+        return systemBars && ((stacksLandscapeComments && !hingeClosed)
             || (!DYDuoMetrics.isDuoHardware && vSize == .regular))
     }
-    private var railWidth: CGFloat { hSize == .compact ? 50 : 54 }
+    private var railWidth: CGFloat { isCompactPhone ? 38 : (hSize == .compact ? 50 : 54) }
     private var chromeSidePadding: CGFloat { 12 }
     private var videoWindow: UIWindow? {
         UIApplication.shared.connectedScenes
@@ -4467,6 +4515,7 @@ struct DYClassicVideoPage: View {
         max(insets.trailing, videoWindow?.safeAreaInsets.right ?? 0)
     }
     private var actionRailTrailingPadding: CGFloat {
+        if isCompactPhone { return 10 }
         guard !inlineNavigation else { return chromeSidePadding }
         // Follow the runtime system column, including the existing optical inset
         // used by Duo chrome. The column midpoint includes the outer side margin.
@@ -4474,19 +4523,24 @@ struct DYClassicVideoPage: View {
                    + theme.media.expandedRailOpticalInset)
     }
     private var mediaBottomInset: CGFloat {
+        if isCompactPhone, systemBars, verticalBarEdge == nil {
+            // 直板模式：把进度条与左下文案整体抬高到悬浮 3-Tab 胶囊上方
+            return max(insets.bottom, DYDuoMetrics.windowBottomInset + 56)
+        }
         // A vertical system toolbar already occupies the side column. After
         // rotation NavigationStack can retain its previous bottom-bar inset;
         // only the physical home-indicator inset belongs below this video.
-        systemBars && verticalBarEdge != nil ? DYDuoMetrics.windowBottomInset : insets.bottom
+        return systemBars && verticalBarEdge != nil ? DYDuoMetrics.windowBottomInset : insets.bottom
     }
     private var contentInsets: EdgeInsets {
         guard systemBars else { return EdgeInsets() }
         let left = DYDuoMetrics.windowLeftInset   // 缓存值，body 里别同步问窗口（AttributeGraph 环）
         // The 24 pt edge tuck is for the trailing Duo column. Restore the
         // complete system bottom inset when tabs become horizontal in portrait.
-        let bottom = verticalBarEdge == nil && !inlineNavigation ? min(insets.bottom, 24) : 0
+        let bottom: CGFloat = isCompactPhone ? 0 : (verticalBarEdge == nil && !inlineNavigation ? min(insets.bottom, 24) : 0)
+        let trailing: CGFloat = inlineNavigation ? 0 : (isCompactPhone ? max(systemColumnInset, railWidth + 16) : max(systemColumnInset, railWidth + chromeSidePadding))
         return EdgeInsets(top: 0, leading: max(insets.leading, left),
-                          bottom: bottom, trailing: inlineNavigation ? 0 : max(systemColumnInset, railWidth + chromeSidePadding))
+                          bottom: bottom, trailing: trailing)
     }
     @Environment(\.appTheme) private var theme
     @Environment(\.colorScheme) private var scheme
@@ -4567,9 +4621,10 @@ struct DYClassicVideoPage: View {
                 // AVFoundation 会直接报 -11828（实测长横屏视频因此黑屏 14–28 秒）。
                 // 长视频：整条缓存好了本地播，没缓存好就走重定向地址流播（1–2 秒起播）。
                 let url = usesOfflineFile ? source : (DYVideoCache.localURL(item.id) ?? source)
+                let playerTopInset = isCompactPhone ? max(insets.top, DYDuoMetrics.windowSafeTop) + 52 : insets.top
                 // 复用播放器：左右切换作者/关注、双击点赞、分区长按、竖滑切视频、底部拖动进度及 VLC 兜底
                 PlayerPage.external(id: item.id, title: item.desc, url: url, durationSec: item.duration,
-                                    isActive: isCurrent, topInset: insets.top, bottomInset: mediaBottomInset,
+                                    isActive: isCurrent, topInset: playerTopInset, bottomInset: mediaBottomInset,
                                     resumePosition: resume, compactChrome: true,
                                     preparedPlayer: usesOfflineFile ? nil : { preloader.take(item.id) },
                                     returnPlayer: usesOfflineFile ? nil : { preloader.giveBack(item.id, $0) },
@@ -4640,7 +4695,8 @@ struct DYClassicVideoPage: View {
                         let viewportBottom = viewport.frame(in: .global).maxY
                         let windowBottom = videoWindow?.bounds.maxY ?? viewportBottom
                         // Keep the rail beside the description and clear of the home dock.
-                        let bottomPadding = max(0, viewportBottom - windowBottom + 96)
+                        let dockLift: CGFloat = isCompactPhone ? 108 : 96
+                        let bottomPadding = max(0, viewportBottom - windowBottom + dockLift)
                         rail.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                             .padding(.bottom, bottomPadding)
                     }
@@ -4709,30 +4765,75 @@ struct DYClassicVideoPage: View {
         visibleVideo.wrappedValue = item
     }
 
-    /// 作者、文案、元数据、音乐；音乐贴近进度条，作者头像归入互动栏。
+    /// 作者、文案、元数据、音乐；音乐贴近进度条，作者头像归入互动栏（直板模式放回作者名左侧）。
     private func info(_ fg: Color) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: isCompactPhone ? 4 : 5) {
             if let product = item.product { DYProductPill(product: product, foreground: fg) }
-            Button(action: onAuthor) {
-                Text("@" + item.author.name).font(.headline.weight(.bold))
-                    .foregroundStyle(fg).lineLimit(1)
+            if isCompactPhone {
+                HStack(spacing: 8) {
+                    ZStack(alignment: .bottomTrailing) {
+                        Button(action: guardedAuthor) {
+                            Group {
+                                if let authorImage {
+                                    Image(uiImage: authorImage).resizable().scaledToFill()
+                                } else {
+                                    Image(systemName: "person.crop.circle.fill")
+                                        .resizable().scaledToFit()
+                                        .foregroundStyle(fg.opacity(0.85))
+                                }
+                            }
+                            .frame(width: 28, height: 28)
+                            .clipShape(Circle())
+                        }
+                        .buttonStyle(.plain)
+                        if let follow = followBadge {
+                            follow.scaleEffect(0.68).offset(x: 5, y: 5)
+                        }
+                    }
+                    Button(action: onAuthor) {
+                        Text("@" + item.author.name).font(.subheadline.weight(.bold))
+                            .foregroundStyle(fg).lineLimit(1)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("douyin.author")
+                }
+            } else {
+                Button(action: onAuthor) {
+                    Text("@" + item.author.name).font(.headline.weight(.bold))
+                        .foregroundStyle(fg).lineLimit(1)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("douyin.author")
             }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("douyin.author")
             if !item.desc.isEmpty {
                 DYClassicExpandableTitle(text: item.desc, foreground: fg.opacity(0.9),
                                   secondary: fg.opacity(0.7), hashtagNames: item.hashtagNames ?? [],
                                   onExpand: expandVideoCaption.map { open in { open(item) } })
             }
-            DYWorkMetadataText(item: item, active: isCurrent)
-                .font(.caption2.weight(.regular))
-                .foregroundStyle(fg.opacity(0.62))
-                .lineLimit(2).fixedSize(horizontal: false, vertical: true)
-            if !item.music.isEmpty {
-                Label(item.music, systemImage: "music.note")
-                    .font(.caption2).lineLimit(1)
-                    .foregroundStyle(fg.opacity(0.54))
-                    .accessibilityIdentifier("douyin.video.music")
+            if isCompactPhone {
+                HStack(spacing: 8) {
+                    DYWorkMetadataText(item: item, active: isCurrent)
+                        .font(.caption2.weight(.regular))
+                        .foregroundStyle(fg.opacity(0.62))
+                        .lineLimit(1)
+                    if !item.music.isEmpty {
+                        Label(item.music, systemImage: "music.note")
+                            .font(.caption2).lineLimit(1)
+                            .foregroundStyle(fg.opacity(0.54))
+                            .accessibilityIdentifier("douyin.video.music")
+                    }
+                }
+            } else {
+                DYWorkMetadataText(item: item, active: isCurrent)
+                    .font(.caption2.weight(.regular))
+                    .foregroundStyle(fg.opacity(0.62))
+                    .lineLimit(2).fixedSize(horizontal: false, vertical: true)
+                if !item.music.isEmpty {
+                    Label(item.music, systemImage: "music.note")
+                        .font(.caption2).lineLimit(1)
+                        .foregroundStyle(fg.opacity(0.54))
+                        .accessibilityIdentifier("douyin.video.music")
+                }
             }
         }
         .themeShadow(.mediaLabel)
@@ -4773,7 +4874,7 @@ struct DYClassicVideoPage: View {
     private func actionCapsule(_ foreground: Color) -> some View {
         actions(foreground)
             .frame(width: railWidth)
-            .padding(.vertical, 7)
+            .padding(.vertical, isCompactPhone ? 6 : 7)
             .glassEffect(.regular, in: .capsule)
             .environment(\.colorScheme, .dark)
             .modifier(DYHoldBoostArea(control: item.images.isEmpty ? boost : nil))
@@ -4810,8 +4911,8 @@ struct DYClassicVideoPage: View {
     /// One set of actions for the current work. Home hosts it above the native
     /// tab selector; standalone work players retain their per-page controls.
     private func actions(_ fg: Color) -> some View {
-        VStack(spacing: 4) {
-            authorButton
+        VStack(spacing: isCompactPhone ? 3 : 4) {
+            if !isCompactPhone { authorButton }
             railItem(liked ? "heart.fill" : "heart", DYFormat.count(item.stats.digg + (liked ? 1 : 0)),
                      tint: liked ? theme.status.danger.color(for: scheme) : fg, "douyin.like", onLike)
             railItem("ellipsis.bubble", DYFormat.count(item.stats.comment), tint: fg, "douyin.comments", onComments)
@@ -4828,20 +4929,25 @@ struct DYClassicVideoPage: View {
     private func guardedAuthor() { if !boost.blocksTap { onAuthor() } }
 
     private func railItem(_ icon: String, _ text: String, tint: Color, _ id: String, _ act: @escaping () -> Void) -> some View {
-        Button(action: { if !boost.blocksTap { act() } }) {
-            VStack(spacing: 2) {
+        let iconSide: CGFloat = isCompactPhone ? 20 : 27
+        let iconBoxHeight: CGFloat = isCompactPhone ? 22 : 30
+        let itemHeight: CGFloat = isCompactPhone ? (text.isEmpty ? 34 : 38) : (text.isEmpty ? 44 : 46)
+        return Button(action: { if !boost.blocksTap { act() } }) {
+            VStack(spacing: isCompactPhone ? 1.5 : 2) {
                 Image(systemName: icon)
                     .resizable().scaledToFit()
-                    .frame(width: 27, height: 27)
+                    .frame(width: iconSide, height: iconSide)
                     .foregroundStyle(tint)
-                    .frame(height: 30)
+                    .frame(height: iconBoxHeight)
                 if !text.isEmpty {
-                    Text(text).font(.caption2.weight(.medium)).monospacedDigit()
+                    Text(text)
+                        .font(isCompactPhone ? .system(size: 10.5, weight: .medium) : .caption2.weight(.medium))
+                        .monospacedDigit()
                         .foregroundStyle(theme.media.onMediaSecondary.color(for: scheme))
                         .lineLimit(1).minimumScaleFactor(0.7)
                 }
             }
-            .frame(width: railWidth, height: text.isEmpty ? 44 : 46)
+            .frame(width: railWidth, height: itemHeight)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

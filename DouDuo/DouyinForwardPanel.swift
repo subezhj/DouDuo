@@ -447,7 +447,7 @@ struct DYNativeForwardPanel: View {
     var onMore: (() -> Void)? = nil
     @AppStorage(DDChromeMode.key) private var mode = DDChromeMode.classic.rawValue
     var body: some View {
-        if #available(iOS 27.1, *), mode == DDChromeMode.duoClassic.rawValue {
+        if #available(iOS 27.1, *), DDChromeMode.isClassicChrome(mode) {
             DYClassicNativeForwardPanel(contacts: contacts, loading: loading, status: status, actions: actions,
                                        onContact: onContact, onAction: onAction, onClose: onClose, selectedID: selectedID, composer: composer, onMore: onMore)
         } else {

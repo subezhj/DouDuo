@@ -99,7 +99,7 @@ struct DYSystemTabBar: ViewModifier {
     var hidden = false
     @AppStorage(DDChromeMode.key) private var mode = DDChromeMode.classic.rawValue
     @ViewBuilder func body(content: Content) -> some View {
-        if #available(iOS 27.1, *), mode == DDChromeMode.duoClassic.rawValue {
+        if #available(iOS 27.1, *), DDChromeMode.isClassicChrome(mode) {
             content.toolbarVisibility(hidden ? .hidden : .visible, for: .tabBar)
                 .toolbarVerticalCompressionBehavior(.prefersToolbarItems)
                 .toolbarBackgroundVisibility(.hidden, for: .bottomBar)
@@ -153,8 +153,11 @@ struct DYNativeVideoActions: View {
         guard onBack != nil, !anchorFrame.isEmpty else { return 0 }
         return min(60, max(0, availableBelowControls - railHeight - 70))
     }
+    @AppStorage(DDChromeMode.key) private var chromeModeRaw = DDChromeMode.classic.rawValue
+    private var isCompactPhone: Bool { DDChromeMode.isCompactPhone(chromeModeRaw) }
     private var showsInlineCleanControl: Bool {
-        onBack == nil && verticalEdge == nil
+        if isCompactPhone { return onBack == nil && verticalEdge == nil && isClean }
+        return onBack == nil && verticalEdge == nil
             && (!DYDuoMetrics.isDuoHardware || (stacksLandscapeComments && !hingeClosed))
     }
     private var slotHeight: CGFloat {

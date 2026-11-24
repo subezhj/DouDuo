@@ -15,7 +15,7 @@ struct DYForwardLayoutProbe: View {
 
     var body: some View {
         Group {
-            if mode == DDChromeMode.duoClassic.rawValue {
+            if DDChromeMode.isClassicChrome(mode) {
                 TabView(selection: $tab) {
                     Tab("我的", systemImage: "person.crop.circle", value: DYMainTab.mine) { Text("离线个人页") }
                     Tab("消息", systemImage: "bubble.left.and.bubble.right", value: DYMainTab.messages) {
@@ -38,10 +38,10 @@ struct DYForwardLayoutProbe: View {
                 Button("分享") { showing = true }.accessibilityIdentifier("douyin.share")
             }
         }
-        .dyBottomSheet(isPresented: Binding(get: { showing && mode == DDChromeMode.duoClassic.rawValue }, set: { showing = $0 }), kind: .share) {
+        .dyBottomSheet(isPresented: Binding(get: { showing && DDChromeMode.isClassicChrome(mode) }, set: { showing = $0 }), kind: .share) {
             DYForwardScreen(item: item)
         }
-        .fullScreenCover(isPresented: Binding(get: { showing && mode != DDChromeMode.duoClassic.rawValue }, set: { showing = $0 })) {
+        .fullScreenCover(isPresented: Binding(get: { showing && !DDChromeMode.isClassicChrome(mode) }, set: { showing = $0 })) {
             DYForwardScreen(item: item).presentationBackground(.clear)
         }
         .modifier(DYForwardFeedbackPresentation(bottomInset: 16))

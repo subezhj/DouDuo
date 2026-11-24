@@ -746,7 +746,7 @@ struct DYCommentPlayerLayout<Video: View>: View {
     @ViewBuilder var video: (EdgeInsets) -> Video
 
     private var usesClassicLayout: Bool {
-        if #available(iOS 27.1, *) { return chromeModeRaw == DDChromeMode.duoClassic.rawValue }
+        if #available(iOS 27.1, *) { return DDChromeMode.isClassicChrome(chromeModeRaw) }
         return false
     }
 
@@ -928,6 +928,7 @@ struct DYClosedPortraitAlignment: ViewModifier {
 
 /// 挂在 App 根视图：整个 App 只读一次铰链状态，放进环境给所有页面用。
 struct DYHingeStateRoot: ViewModifier {
+    @AppStorage(DDChromeMode.key) private var chromeModeRaw = DDChromeMode.classic.rawValue
     @State private var closed = false
     @State private var fullyOpen = false
     @State private var compactWindow = false
@@ -937,7 +938,8 @@ struct DYHingeStateRoot: ViewModifier {
             content
                 .environment(\.dyHingeClosed, closed)
                 .environment(\.dyStacksLandscapeComments,
-                             DYDuoMetrics.isDuoHardware && (closed || (fullyOpen && compactWindow)))
+                             (DYDuoMetrics.isDuoHardware && (closed || (fullyOpen && compactWindow)))
+                             || (DDChromeMode.isCompactPhone(chromeModeRaw) && !DYDuoMetrics.isDuoHardware && compactWindow))
                 .environment(\.dyDuoLandscapeWindow,
                              DYDuoMetrics.isDuoHardware && fullyOpen && !compactWindow)
                 .onGeometryChange(for: Bool.self) { geo in

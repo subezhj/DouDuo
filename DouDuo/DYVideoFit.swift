@@ -39,9 +39,9 @@ enum DYVideoFit {
         }
     }
 
-    /// `duoClassic` 走顶栏更多；其余界面模式走播放页更多。
+    /// `duoClassic` / `iphoneCompact` 走顶栏更多；其余界面模式走播放页更多。
     static func moreSurface(for chromeMode: String) -> Surface {
-        chromeMode == "duoClassic" ? .classicMore : .upstreamMore
+        (chromeMode == "duoClassic" || chromeMode == "iphoneCompact") ? .classicMore : .upstreamMore
     }
 
     static func storedFillWidth(in defaults: UserDefaults) -> Bool {

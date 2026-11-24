@@ -1970,14 +1970,14 @@ struct DYMineScreen: View {
     var body: some View {
         NavigationStack {
             content
-                // 左缘右滑返回（和左上「返回」同条件：经典模式下「我的」是底部 Tab，没有上一层）
-                .dyEdgeBack(enabled: !embedded && chromeModeRaw != DDChromeMode.duoClassic.rawValue) { dismiss() }
+                // 左缘右滑返回（和左上「返回」同条件：经典/直板模式下「我的」是底部 Tab，没有上一层）
+                .dyEdgeBack(enabled: !embedded && !DDChromeMode.isClassicChrome(chromeModeRaw)) { dismiss() }
                 .modifier(DYSystemTabBar())
                 .navigationTitle(user?.name ?? "我的")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar(embedded ? .hidden : .automatic, for: .navigationBar)
                 .toolbar {
-                    if !embedded && chromeModeRaw != DDChromeMode.duoClassic.rawValue {
+                    if !embedded && !DDChromeMode.isClassicChrome(chromeModeRaw) {
                         ToolbarItem(placement: .navigation) { Button("返回", systemImage: "chevron.backward") { dismiss() } }
                     }
                     // 「网页版 / 登录」按钮已按老板要求去掉：未登录时页内仍有「去登录」入口，功能不受影响
