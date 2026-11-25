@@ -3554,17 +3554,16 @@ struct DYClassicFeedScreen: DYRecommendFeedHost {
     }
 
     private var compactBottomDock: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 2) {
             compactDockButton(tab: .home, icon: "house", activeIcon: "house.fill", label: "首页", badge: 0)
             compactDockButton(tab: .messages, icon: "ellipsis.bubble", activeIcon: "ellipsis.bubble.fill", label: "消息", badge: noticeUnread)
             compactDockButton(tab: .mine, icon: "person", activeIcon: "person.fill", label: "我的", badge: 0)
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 5)
+        .padding(.horizontal, 5)
+        .padding(.vertical, 4)
         .glassEffect(.regular, in: .capsule)
         .environment(\.colorScheme, .dark)
-        .padding(.bottom, max(DYDuoMetrics.windowBottomInset - 12, 16))
-        .ignoresSafeArea(.container, edges: .bottom)
+        .padding(.bottom, 18)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("douyin.compactDock")
     }
@@ -3580,9 +3579,9 @@ struct DYClassicFeedScreen: DYRecommendFeedHost {
         } label: {
             ZStack(alignment: .topTrailing) {
                 Image(systemName: selected ? activeIcon : icon)
-                    .font(.system(size: 18, weight: selected ? .semibold : .regular))
+                    .font(.system(size: 17, weight: selected ? .semibold : .regular))
                     .foregroundStyle(selected ? Color.white : Color.white.opacity(0.62))
-                    .frame(width: 64, height: 36)
+                    .frame(width: 60, height: 34)
                     .background {
                         if selected {
                             Capsule().fill(Color.white.opacity(0.16))
@@ -3592,8 +3591,8 @@ struct DYClassicFeedScreen: DYRecommendFeedHost {
                 if badge > 0 {
                     Circle()
                         .fill(theme.status.danger.color(for: .dark))
-                        .frame(width: 7, height: 7)
-                        .offset(x: -16, y: 6)
+                        .frame(width: 6, height: 6)
+                        .offset(x: -15, y: 6)
                 }
             }
         }
@@ -3619,6 +3618,7 @@ struct DYClassicFeedScreen: DYRecommendFeedHost {
                     .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
         }
+        .ignoresSafeArea(.container, edges: isCompactPhone ? .bottom : [])
         .animation(.snappy(duration: 0.2), value: compactDockVisible)
         .environment(\.dyForwardOpenChat, { receipt in
             forwardedChat = receipt
@@ -4607,7 +4607,7 @@ struct DYClassicVideoPage: View {
         return systemBars && ((stacksLandscapeComments && !hingeClosed)
             || (!DYDuoMetrics.isDuoHardware && vSize == .regular))
     }
-    private var railWidth: CGFloat { isCompactPhone ? 38 : (hSize == .compact ? 50 : 54) }
+    private var railWidth: CGFloat { isCompactPhone ? 46 : (hSize == .compact ? 50 : 54) }
     private var chromeSidePadding: CGFloat { 12 }
     private var videoWindow: UIWindow? {
         UIApplication.shared.connectedScenes
@@ -4622,7 +4622,7 @@ struct DYClassicVideoPage: View {
         max(insets.trailing, videoWindow?.safeAreaInsets.right ?? 0)
     }
     private var actionRailTrailingPadding: CGFloat {
-        if isCompactPhone { return 10 }
+        if isCompactPhone { return 12 }
         guard !inlineNavigation else { return chromeSidePadding }
         // Follow the runtime system column, including the existing optical inset
         // used by Duo chrome. The column midpoint includes the outer side margin.
@@ -4631,8 +4631,8 @@ struct DYClassicVideoPage: View {
     }
     private var mediaBottomInset: CGFloat {
         if isCompactPhone, systemBars, verticalBarEdge == nil {
-            // 直板模式：进度条悬停在 46pt 紧凑底栏正上方（约 82pt 处），与底栏留出干净间距
-            return max(DYDuoMetrics.windowBottomInset, 28) + 58
+            // 直板模式：底栏位于物理底边 18~60pt；进度条精准悬停在 72pt（mediaBottomPadding = 82-16 = 66, 线条中心 +8 = 74pt）
+            return 82
         }
         // A vertical system toolbar already occupies the side column. After
         // rotation NavigationStack can retain its previous bottom-bar inset;
@@ -4645,7 +4645,7 @@ struct DYClassicVideoPage: View {
         // The 24 pt edge tuck is for the trailing Duo column. Restore the
         // complete system bottom inset when tabs become horizontal in portrait.
         let bottom: CGFloat = isCompactPhone ? 0 : (verticalBarEdge == nil && !inlineNavigation ? min(insets.bottom, 24) : 0)
-        let trailing: CGFloat = inlineNavigation ? 0 : (isCompactPhone ? max(systemColumnInset, railWidth + 16) : max(systemColumnInset, railWidth + chromeSidePadding))
+        let trailing: CGFloat = inlineNavigation ? 0 : (isCompactPhone ? max(systemColumnInset, railWidth + 20) : max(systemColumnInset, railWidth + chromeSidePadding))
         return EdgeInsets(top: 0, leading: max(insets.leading, left),
                           bottom: bottom, trailing: trailing)
     }
@@ -4788,8 +4788,14 @@ struct DYClassicVideoPage: View {
             }
 
             if !cleanScreen && !inlineCommentVisible {
+                if isCompactPhone {
+                    LinearGradient(colors: [.clear, .black.opacity(0.52)], startPoint: .top, endPoint: .bottom)
+                        .frame(height: 230)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                        .allowsHitTesting(false)
+                }
                 info(fg)
-                    .padding(.horizontal, chromeSidePadding)
+                    .padding(.horizontal, isCompactPhone ? 16 : chromeSidePadding)
                     .padding(contentInsets)
                     .padding(.bottom, DYDuoMetrics.mediaBottomPadding(mediaBottomInset) + (isCompactPhone ? 22 : (item.images.isEmpty ? 16 * ui : 16)))
             }
@@ -4804,7 +4810,7 @@ struct DYClassicVideoPage: View {
                         let viewportBottom = viewport.frame(in: .global).maxY
                         let windowBottom = videoWindow?.bounds.maxY ?? viewportBottom
                         // Keep the rail beside the description and clear of the home dock.
-                        let dockLift: CGFloat = isCompactPhone ? 98 : 96
+                        let dockLift: CGFloat = isCompactPhone ? 90 : 96
                         let bottomPadding = max(0, viewportBottom - windowBottom + dockLift)
                         rail.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                             .padding(.bottom, bottomPadding)
@@ -4876,35 +4882,49 @@ struct DYClassicVideoPage: View {
 
     /// 作者、文案、元数据、音乐；音乐贴近进度条，作者头像归入互动栏（直板模式放回作者名左侧）。
     private func info(_ fg: Color) -> some View {
-        VStack(alignment: .leading, spacing: isCompactPhone ? 4 : 5) {
+        VStack(alignment: .leading, spacing: isCompactPhone ? 6 : 5) {
             if let product = item.product { DYProductPill(product: product, foreground: fg) }
             if isCompactPhone {
                 HStack(spacing: 8) {
-                    ZStack(alignment: .bottomTrailing) {
-                        Button(action: guardedAuthor) {
-                            Group {
-                                if let authorImage {
-                                    Image(uiImage: authorImage).resizable().scaledToFill()
-                                } else {
-                                    Image(systemName: "person.crop.circle.fill")
-                                        .resizable().scaledToFit()
-                                        .foregroundStyle(fg.opacity(0.85))
-                                }
+                    Button(action: guardedAuthor) {
+                        Group {
+                            if let authorImage {
+                                Image(uiImage: authorImage).resizable().scaledToFill()
+                            } else {
+                                Image(systemName: "person.crop.circle.fill")
+                                    .resizable().scaledToFit()
+                                    .foregroundStyle(fg.opacity(0.85))
                             }
-                            .frame(width: 28, height: 28)
-                            .clipShape(Circle())
                         }
-                        .buttonStyle(.plain)
-                        if let follow = followBadge {
-                            follow.scaleEffect(0.68).offset(x: 5, y: 5)
-                        }
+                        .frame(width: 30, height: 30)
+                        .clipShape(Circle())
+                        .overlay(Circle().stroke(.white.opacity(0.45), lineWidth: 0.75))
                     }
+                    .buttonStyle(.plain)
                     Button(action: onAuthor) {
                         Text("@" + item.author.name).font(.subheadline.weight(.bold))
                             .foregroundStyle(fg).lineLimit(1)
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("douyin.author")
+                    if bridge != nil, !authorFollowed,
+                       item.author.uid?.isEmpty == false || item.author.secUid?.isEmpty == false {
+                        Button {
+                            guard !boost.blocksTap else { return }
+                            Task { await followAuthor() }
+                        } label: {
+                            Text(followBusy ? "…" : "+ 关注")
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(theme.status.danger.color(for: scheme), in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(followBusy)
+                        .accessibilityLabel("关注 " + item.author.name)
+                        .accessibilityIdentifier("douyin.author.followBadge")
+                    }
                 }
             } else {
                 Button(action: onAuthor) {
@@ -4983,7 +5003,7 @@ struct DYClassicVideoPage: View {
     private func actionCapsule(_ foreground: Color) -> some View {
         actions(foreground)
             .frame(width: railWidth)
-            .padding(.vertical, isCompactPhone ? 6 : 7)
+            .padding(.vertical, isCompactPhone ? 10 : 7)
             .glassEffect(.regular, in: .capsule)
             .environment(\.colorScheme, .dark)
             .modifier(DYHoldBoostArea(control: item.images.isEmpty ? boost : nil))
@@ -5020,7 +5040,7 @@ struct DYClassicVideoPage: View {
     /// One set of actions for the current work. Home hosts it above the native
     /// tab selector; standalone work players retain their per-page controls.
     private func actions(_ fg: Color) -> some View {
-        VStack(spacing: isCompactPhone ? 3 : 4) {
+        VStack(spacing: isCompactPhone ? 8 : 4) {
             if !isCompactPhone { authorButton }
             railItem(liked ? "heart.fill" : "heart", DYFormat.count(item.stats.digg + (liked ? 1 : 0)),
                      tint: liked ? theme.status.danger.color(for: scheme) : fg, "douyin.like", onLike)
@@ -5038,11 +5058,11 @@ struct DYClassicVideoPage: View {
     private func guardedAuthor() { if !boost.blocksTap { onAuthor() } }
 
     private func railItem(_ icon: String, _ text: String, tint: Color, _ id: String, _ act: @escaping () -> Void) -> some View {
-        let iconSide: CGFloat = isCompactPhone ? 20 : 27
-        let iconBoxHeight: CGFloat = isCompactPhone ? 22 : 30
-        let itemHeight: CGFloat = isCompactPhone ? (text.isEmpty ? 34 : 38) : (text.isEmpty ? 44 : 46)
+        let iconSide: CGFloat = isCompactPhone ? 21 : 27
+        let iconBoxHeight: CGFloat = isCompactPhone ? 24 : 30
+        let itemHeight: CGFloat = isCompactPhone ? (text.isEmpty ? 36 : 42) : (text.isEmpty ? 44 : 46)
         return Button(action: { if !boost.blocksTap { act() } }) {
-            VStack(spacing: isCompactPhone ? 1.5 : 2) {
+            VStack(spacing: isCompactPhone ? 3 : 2) {
                 Image(systemName: icon)
                     .resizable().scaledToFit()
                     .frame(width: iconSide, height: iconSide)
@@ -5050,10 +5070,10 @@ struct DYClassicVideoPage: View {
                     .frame(height: iconBoxHeight)
                 if !text.isEmpty {
                     Text(text)
-                        .font(isCompactPhone ? .system(size: 10.5, weight: .medium) : .caption2.weight(.medium))
+                        .font(isCompactPhone ? .system(size: 11, weight: .medium) : .caption2.weight(.medium))
                         .monospacedDigit()
                         .foregroundStyle(theme.media.onMediaSecondary.color(for: scheme))
-                        .lineLimit(1).minimumScaleFactor(0.7)
+                        .lineLimit(1).minimumScaleFactor(0.75)
                 }
             }
             .frame(width: railWidth, height: itemHeight)
