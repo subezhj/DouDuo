@@ -11,7 +11,7 @@ struct DYVideoMoreMenu: View {
             extras
         } label: {
             Image(systemName: "ellipsis")
-                .font(isCompactPhone ? .system(size: 18, weight: .semibold) : .title2.weight(.semibold))
+                .font(isCompactPhone ? .system(size: 18, weight: .regular) : .title2.weight(.semibold))
                 .foregroundStyle(.white)
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())

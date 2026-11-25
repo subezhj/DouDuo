@@ -3554,13 +3554,14 @@ struct DYClassicFeedScreen: DYRecommendFeedHost {
     }
 
     private var compactBottomDock: some View {
-        HStack(spacing: 2) {
-            compactDockButton(tab: .home, icon: "house", activeIcon: "house.fill", label: "首页", badge: 0)
-            compactDockButton(tab: .messages, icon: "ellipsis.bubble", activeIcon: "ellipsis.bubble.fill", label: "消息", badge: noticeUnread)
-            compactDockButton(tab: .mine, icon: "person", activeIcon: "person.fill", label: "我的", badge: 0)
+        HStack(spacing: 4) {
+            compactDockButton(tab: .home, icon: "house", label: "首页", badge: 0)
+            compactDockButton(tab: .messages, icon: "ellipsis.bubble", label: "消息", badge: noticeUnread)
+            compactDockButton(tab: .mine, icon: "person", label: "我的", badge: 0)
         }
-        .padding(.horizontal, 5)
+        .padding(.horizontal, 6)
         .padding(.vertical, 4)
+        .frame(height: 44)
         .glassEffect(.regular, in: .capsule)
         .environment(\.colorScheme, .dark)
         .padding(.bottom, 18)
@@ -3568,7 +3569,7 @@ struct DYClassicFeedScreen: DYRecommendFeedHost {
         .accessibilityIdentifier("douyin.compactDock")
     }
 
-    private func compactDockButton(tab target: DYMainTab, icon: String, activeIcon: String, label: String, badge: Int) -> some View {
+    private func compactDockButton(tab target: DYMainTab, icon: String, label: String, badge: Int) -> some View {
         let selected = mainTab == target
         return Button {
             if mainTab == target {
@@ -3578,21 +3579,22 @@ struct DYClassicFeedScreen: DYRecommendFeedHost {
             }
         } label: {
             ZStack(alignment: .topTrailing) {
-                Image(systemName: selected ? activeIcon : icon)
-                    .font(.system(size: 17, weight: selected ? .semibold : .regular))
-                    .foregroundStyle(selected ? Color.white : Color.white.opacity(0.62))
-                    .frame(width: 60, height: 34)
-                    .background {
-                        if selected {
-                            Capsule().fill(Color.white.opacity(0.16))
-                        }
-                    }
-                    .contentShape(Capsule())
+                VStack(spacing: 3) {
+                    Image(systemName: icon)
+                        .font(.system(size: 19, weight: selected ? .medium : .light))
+                        .foregroundStyle(selected ? Color.white : Color.white.opacity(0.55))
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 3.5, height: 3.5)
+                        .opacity(selected ? 1 : 0)
+                }
+                .frame(width: 58, height: 36)
+                .contentShape(Capsule())
                 if badge > 0 {
                     Circle()
                         .fill(theme.status.danger.color(for: .dark))
                         .frame(width: 6, height: 6)
-                        .offset(x: -15, y: 6)
+                        .offset(x: -14, y: 4)
                 }
             }
         }
@@ -3939,7 +3941,7 @@ struct DYClassicFeedScreen: DYRecommendFeedHost {
             openSearch()
         } label: {
             Image(systemName: "magnifyingglass")
-                .font(isCompactPhone ? .system(size: 18, weight: .medium) : .title2)
+                .font(isCompactPhone ? .system(size: 18, weight: .light) : .title2)
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
         }
@@ -4610,7 +4612,7 @@ struct DYClassicVideoPage: View {
         return systemBars && ((stacksLandscapeComments && !hingeClosed)
             || (!DYDuoMetrics.isDuoHardware && vSize == .regular))
     }
-    private var railWidth: CGFloat { isCompactPhone ? 46 : (hSize == .compact ? 50 : 54) }
+    private var railWidth: CGFloat { isCompactPhone ? 44 : (hSize == .compact ? 50 : 54) }
     private var chromeSidePadding: CGFloat { 12 }
     private var videoWindow: UIWindow? {
         UIApplication.shared.connectedScenes
@@ -5061,19 +5063,26 @@ struct DYClassicVideoPage: View {
     private func guardedAuthor() { if !boost.blocksTap { onAuthor() } }
 
     private func railItem(_ icon: String, _ text: String, tint: Color, _ id: String, _ act: @escaping () -> Void) -> some View {
-        let iconSide: CGFloat = isCompactPhone ? 21 : 27
-        let iconBoxHeight: CGFloat = isCompactPhone ? 24 : 30
-        let itemHeight: CGFloat = isCompactPhone ? (text.isEmpty ? 36 : 42) : (text.isEmpty ? 44 : 46)
+        let iconSide: CGFloat = isCompactPhone ? 20 : 27
+        let iconBoxHeight: CGFloat = isCompactPhone ? 23 : 30
+        let itemHeight: CGFloat = isCompactPhone ? (text.isEmpty ? 36 : 41) : (text.isEmpty ? 44 : 46)
         return Button(action: { if !boost.blocksTap { act() } }) {
             VStack(spacing: isCompactPhone ? 3 : 2) {
-                Image(systemName: icon)
-                    .resizable().scaledToFit()
-                    .frame(width: iconSide, height: iconSide)
-                    .foregroundStyle(tint)
-                    .frame(height: iconBoxHeight)
+                if isCompactPhone {
+                    Image(systemName: icon)
+                        .font(.system(size: 19, weight: .light))
+                        .foregroundStyle(tint)
+                        .frame(height: iconBoxHeight)
+                } else {
+                    Image(systemName: icon)
+                        .resizable().scaledToFit()
+                        .frame(width: iconSide, height: iconSide)
+                        .foregroundStyle(tint)
+                        .frame(height: iconBoxHeight)
+                }
                 if !text.isEmpty {
                     Text(text)
-                        .font(isCompactPhone ? .system(size: 11, weight: .medium) : .caption2.weight(.medium))
+                        .font(isCompactPhone ? .system(size: 10.5, weight: .regular) : .caption2.weight(.medium))
                         .monospacedDigit()
                         .foregroundStyle(theme.media.onMediaSecondary.color(for: scheme))
                         .lineLimit(1).minimumScaleFactor(0.75)
