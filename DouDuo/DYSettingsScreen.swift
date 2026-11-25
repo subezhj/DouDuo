@@ -17,6 +17,7 @@ struct DYSettingsScreen: View {
     // 界面
     @AppStorage(DDAppearance.key) private var appearance = DDAppearance.dark.rawValue
     @AppStorage(DDChromeMode.key) private var chromeMode = DDChromeMode.classic.rawValue
+    @AppStorage(DDTextSize.key) private var textSize = DDTextSize.standard.rawValue
     // 播放
     @AppStorage(DYVideoAmbient.key) private var ambientLevel = DYVideoAmbient.defaultLevel
     @AppStorage(DYAutoPiP.storageKey) private var autoPiP = false
@@ -70,6 +71,21 @@ struct DYSettingsScreen: View {
                             }
                         }
                         .accessibilityIdentifier("settings.chrome")
+                    }
+                    row(.textSize) {
+                        HStack {
+                            Text("字体大小")
+                            Spacer(minLength: 12)
+                            Picker("字体大小", selection: $textSize) {
+                                ForEach(DDTextSize.allCases) { s in
+                                    Text(s.title).tag(s.rawValue)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .labelsHidden()
+                            .frame(maxWidth: 210)
+                            .accessibilityIdentifier("settings.textSize")
+                        }
                     }
                 } header: {
                     Text("界面")
@@ -333,7 +349,7 @@ struct DYSettingsScreen: View {
 
 /// 每个设置项的 ⓘ 说明：开 / 关分别会怎样（老板 11-24）
 enum DYSettingInfo: String, Identifiable {
-    case chrome, ambient, launchMuted, danmaku, danmakuDensity, keywords, hideSeen, feedLive, feedAds, feedProduct
+    case chrome, textSize, ambient, launchMuted, danmaku, danmakuDensity, keywords, hideSeen, feedLive, feedAds, feedProduct
     case wifiSaver, cellSaver, cacheCount, dmNotify, dmDetail
     case landscapeOnly, portraitMix, dedupe, autoPiP, replyKeyboard, webComment, streaming
     var id: String { rawValue }
@@ -341,6 +357,7 @@ enum DYSettingInfo: String, Identifiable {
     var title: String {
         switch self {
         case .chrome: "界面模式"
+        case .textSize: "字体大小"
         case .ambient: "环境光"
         case .launchMuted: "打开时默认静音"
         case .danmaku: "显示弹幕"
@@ -369,6 +386,7 @@ enum DYSettingInfo: String, Identifiable {
     var lines: [(String, String)] {
         switch self {
         case .chrome: [("说明", "五种播放页布局：默认、简洁、极简、经典、直板（针对直板 iPhone 精简顶栏与超窄轻玻璃互动栏）。只改按钮和信息怎么摆，不影响推荐和播放。")]
+        case .textSize: [("说明", "统一调节全局界面文字（评论区、文案、消息、设置）及弹幕字号。选「系统」则跟随 iOS 系统字体大小。")]
         case .ambient: [("说明", "视频没铺满屏幕时，四周的空白跟着画面颜色变化。分关 / 亮 / 中 / 暗 / 很暗；选「关」就是纯黑边。")]
         case .launchMuted: [("开", "每次打开 DouDuo 都先静音，并提示「已静音播放」；不会打断你正在放的音乐。"), ("关", "打开就带声音播放。")]
         case .danmaku: [("开", "视频上方 1/3 区域显示弹幕。"), ("关", "不显示弹幕，发弹幕仍在播放页菜单里。")]

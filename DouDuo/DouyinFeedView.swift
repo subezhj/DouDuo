@@ -3939,7 +3939,7 @@ struct DYClassicFeedScreen: DYRecommendFeedHost {
             openSearch()
         } label: {
             Image(systemName: "magnifyingglass")
-                .font(.title2)
+                .font(isCompactPhone ? .system(size: 18, weight: .medium) : .title2)
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
         }
@@ -3953,13 +3953,16 @@ struct DYClassicFeedScreen: DYRecommendFeedHost {
 
     /// 保留原版频道切换；两侧操作及安全区由系统导航栏管理。
     private var topBar: some View {
-        HStack(spacing: 14) {
+        HStack(spacing: isCompactPhone ? 16 : 14) {
             ForEach(DYClassicChannelDrag.order, id: \.self) { channel in
                 Button { tapChannel(channel) } label: {
                     VStack(spacing: 3) {
-                        Text(channel.title).font(.headline.weight(tab == channel ? .bold : .medium))
+                        Text(channel.title)
+                            .font(isCompactPhone
+                                  ? .system(size: 15.5, weight: tab == channel ? .semibold : .regular)
+                                  : .headline.weight(tab == channel ? .bold : .medium))
                             .foregroundStyle(.white.opacity(tab == channel ? 1 : 0.62))
-                        Capsule().fill(.white).frame(width: 16, height: 3)
+                        Capsule().fill(.white).frame(width: isCompactPhone ? 14 : 16, height: isCompactPhone ? 2.5 : 3)
                             .opacity(tab == channel ? 1 : 0)
                     }
                     .frame(minHeight: 44).contentShape(Rectangle())

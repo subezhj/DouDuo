@@ -205,6 +205,7 @@ struct DouDuoApp: App {
             #if DEBUG
             .overlay(alignment: .topLeading) { DDAppearanceStateProbe() }
             #endif
+            .modifier(DDTextSizeModifier())
             .modifier(DYHingeStateRoot())
             .modifier(DYCollectPromptHost(owner: .feed))
             .task(id: scenePhase) {

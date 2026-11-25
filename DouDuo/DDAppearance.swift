@@ -54,3 +54,45 @@ extension Color {
     /// 信息页左右分栏（联系人 | 聊天）之间的分割线，比普通分隔线更显眼
     static let ddMessageSplitDivider = Color("MessageSplitDivider")
 }
+
+/// 全局文字大小档位：同时作用于评论区、首页文案、设置、消息与弹幕。
+enum DDTextSize: String, CaseIterable, Identifiable {
+    case small, standard, large, system
+
+    static let key = "douyin_text_size_v1"
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .small: "偏小"
+        case .standard: "标准"
+        case .large: "偏大"
+        case .system: "系统"
+        }
+    }
+
+    var dynamicTypeSize: DynamicTypeSize? {
+        switch self {
+        case .small: .small
+        case .standard: .medium
+        case .large: .large
+        case .system: nil
+        }
+    }
+
+    static var current: DDTextSize {
+        DDTextSize(rawValue: UserDefaults.standard.string(forKey: key) ?? "") ?? .standard
+    }
+}
+
+struct DDTextSizeModifier: ViewModifier {
+    @AppStorage(DDTextSize.key) private var raw = DDTextSize.standard.rawValue
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if let size = (DDTextSize(rawValue: raw) ?? .standard).dynamicTypeSize {
+            content.dynamicTypeSize(size)
+        } else {
+            content
+        }
+    }
+}

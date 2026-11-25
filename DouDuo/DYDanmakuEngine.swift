@@ -20,9 +20,19 @@ import QuartzCore
 //   - 跳转/暂停后重新开始就清屏，从当前时间往后排。
 
 enum DYDanmakuStyle {
-    /// 抖音的弹幕比原来大一号（原来 15）
-    static let fontSize: CGFloat = 17
-    static let laneHeight: CGFloat = 32
+    /// 动态弹幕字号：联动设置页「字体大小」与直板模式（直板模式默认更轻巧的 14pt，原模式保持 17pt）
+    static var fontSize: CGFloat {
+        let compact = UserDefaults.standard.string(forKey: DDChromeMode.key) == DDChromeMode.iphoneCompact.rawValue
+        switch DDTextSize.current {
+        case .small: return compact ? 12.5 : 14
+        case .standard: return compact ? 14 : 17
+        case .large: return compact ? 16 : 18.5
+        case .system: return compact ? 14 : 17
+        }
+    }
+    static var laneHeight: CGFloat {
+        (fontSize * 1.85).rounded()
+    }
     /// 一条弹幕从右边进屏到左边完全出屏用的时间：短的偏慢、长的偏快（抖音观感）
     /// 过屏时长按长度线性插值：屏宽的弹幕约 8.5s，宽度为屏宽 60% 以上的长弹幕约 6.0s
     static func travelSeconds(width: CGFloat, screen: CGFloat) -> Double {
@@ -59,6 +69,7 @@ final class DYDanmakuEngineView: UIView {
     private var pool: [CALayer] = []
     private var images: [String: CGImage] = [:]
     private var sizes: [String: CGSize] = [:]
+    private var cachedFontSize: CGFloat = 0
     private var lastShown: [String: Double] = [:]   // 去重：同文本 10s 内不重复
     private var link: CADisplayLink?
     private var clock = DYDanmakuClock()
@@ -279,9 +290,15 @@ final class DYDanmakuEngineView: UIView {
     }
 
     private func image(for d: DYDanmaku) -> CGImage? {
+        let currentSize = DYDanmakuStyle.fontSize
+        if cachedFontSize != currentSize {
+            cachedFontSize = currentSize
+            images.removeAll()
+            sizes.removeAll()
+        }
         if let i = images[d.id] { return i }
         if images.count > 800 { images.removeAll(); sizes.removeAll() }
-        let font = UIFont.systemFont(ofSize: DYDanmakuStyle.fontSize, weight: .semibold)
+        let font = UIFont.systemFont(ofSize: currentSize, weight: .semibold)
         let shadow = NSShadow()
         shadow.shadowColor = UIColor.black.withAlphaComponent(0.7)
         shadow.shadowBlurRadius = 1.5
