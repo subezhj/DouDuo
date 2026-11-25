@@ -3239,7 +3239,7 @@ struct DYClassicFeedScreen: DYRecommendFeedHost {
         if tab == .live { Task { await live.load(bridge, reset: true) } }
     }
 
-    var body: some View {
+    private var bodyCore: some View {
         systemTabs
         .modifier(DYSearchPresentation(bridge: bridge, session: $searchSession, isSplit: $searchIsSplit,
                                       onOpen: { showComments = false }))
@@ -3409,6 +3409,10 @@ struct DYClassicFeedScreen: DYRecommendFeedHost {
             preloader.clear()
             DDPlayback.shared.endSettingsCover(settingsCoverID)
         }
+    }
+
+    var body: some View {
+        bodyCore
         .environment(\.dyOpenSettings, { showSettings = true })
         .sheet(isPresented: $showSettings, onDismiss: {
             DDPlayback.shared.endSettingsCover(settingsCoverID)
@@ -3485,40 +3489,44 @@ struct DYClassicFeedScreen: DYRecommendFeedHost {
         .badge(noticeUnread)
     }
 
+    private var homeTabContent: some View {
+        NavigationStack {
+            layoutRoot
+                .background { DYHomeReselectionGuard(onDoubleTap: { tapChannel(.recommend) }).allowsHitTesting(false) }
+                .ignoresSafeArea(.container, edges: presentsLandscapeComments ? [.top, .horizontal]
+                                 : hidesCommentStatus ? .horizontal : [])
+                .coordinateSpace(.named("douduo.feed"))
+                .environment(\.duoSystemBars, true)
+                .environment(\.duoInlineVideoNavigation, sidePanelOpen || hidesCommentStatus)
+                .environment(\.duoVisibleVideo, $visibleVideo)
+                .environment(\.duoCleanScreen, cleanScreen)
+                .overlayPreferenceValue(DYActiveVideoActionsKey.self) { actions in
+                    DYNativeVideoActions(actions: hidesVideoChrome ? nil : actions,
+                                         isClean: cleanScreen,
+                                         onToggleClean: { cleanScreen.toggle() },
+                                         inlineTopInset: headerTopInset)
+                        .id(horizontalCommentStatus || hidesCommentStatus)
+                }
+                // Non-folding devices use the custom header. An empty native
+                // navigation bar would intercept its taps and cover Search.
+                .toolbarVisibility(liveRoomOpen || !DYDuoMetrics.isDuoHardware ? .hidden : .visible, for: .navigationBar)
+                .toolbarBackgroundVisibility(.hidden, for: .navigationBar, .bottomBar)
+                .toolbarColorScheme(.dark, for: .navigationBar, .bottomBar)
+                .dyDisableNavMinimization()
+                .scrollEdgeEffectHidden(true, for: .all)
+                // Hide the underlying native selector for compact
+                // sheets too, so dismissing comments does not restore
+                // a previously expanded tab picker over the video rail.
+                .modifier(DYSystemTabBar(hidden: hidesVideoChrome || cleanScreen))
+                .modifier(DYCommentBarPolicy(hidesStatus: hidesCommentStatus,
+                                             usesHorizontalStatus: horizontalCommentStatus))
+        }
+        .tint(nil)
+    }
+
     private var homeTab: some TabContent<DYMainTab> {
         Tab("首页", systemImage: "house", value: DYMainTab.home) {
-            NavigationStack {
-                layoutRoot
-                    .background { DYHomeReselectionGuard(onDoubleTap: { tapChannel(.recommend) }).allowsHitTesting(false) }
-                    .ignoresSafeArea(.container, edges: presentsLandscapeComments ? [.top, .horizontal]
-                                     : hidesCommentStatus ? .horizontal : [])
-                    .coordinateSpace(.named("douduo.feed"))
-                    .environment(\.duoSystemBars, true)
-                    .environment(\.duoInlineVideoNavigation, sidePanelOpen || hidesCommentStatus)
-                    .environment(\.duoVisibleVideo, $visibleVideo)
-                    .environment(\.duoCleanScreen, cleanScreen)
-                    .overlayPreferenceValue(DYActiveVideoActionsKey.self) { actions in
-                        DYNativeVideoActions(actions: hidesVideoChrome ? nil : actions,
-                                             isClean: cleanScreen,
-                                             onToggleClean: { cleanScreen.toggle() },
-                                             inlineTopInset: headerTopInset)
-                            .id(horizontalCommentStatus || hidesCommentStatus)
-                    }
-                    // Non-folding devices use the custom header. An empty native
-                    // navigation bar would intercept its taps and cover Search.
-                    .toolbarVisibility(liveRoomOpen || !DYDuoMetrics.isDuoHardware ? .hidden : .visible, for: .navigationBar)
-                    .toolbarBackgroundVisibility(.hidden, for: .navigationBar, .bottomBar)
-                    .toolbarColorScheme(.dark, for: .navigationBar, .bottomBar)
-                    .dyDisableNavMinimization()
-                    .scrollEdgeEffectHidden(true, for: .all)
-                    // Hide the underlying native selector for compact
-                    // sheets too, so dismissing comments does not restore
-                    // a previously expanded tab picker over the video rail.
-                    .modifier(DYSystemTabBar(hidden: hidesVideoChrome || cleanScreen))
-                    .modifier(DYCommentBarPolicy(hidesStatus: hidesCommentStatus,
-                                                 usesHorizontalStatus: horizontalCommentStatus))
-            }
-            .tint(nil)
+            homeTabContent
         }
     }
 
