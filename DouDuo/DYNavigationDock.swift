@@ -99,18 +99,20 @@ struct DYSystemTabBar: ViewModifier {
     var hidden = false
     @AppStorage(DDChromeMode.key) private var mode = DDChromeMode.classic.rawValue
     @ViewBuilder func body(content: Content) -> some View {
+        #if NO_IOS27_SDK
+        if DDChromeMode.isClassicChrome(mode) {
+            content.toolbarVisibility(hidden ? .hidden : .visible, for: .tabBar)
+                .toolbarBackgroundVisibility(.hidden, for: .bottomBar)
+                .tabBarMinimizeBehavior(.never)
+        } else { content }
+        #else
         if #available(iOS 27.1, *), DDChromeMode.isClassicChrome(mode) {
-            #if !NO_IOS27_SDK
             content.toolbarVisibility(hidden ? .hidden : .visible, for: .tabBar)
                 .toolbarVerticalCompressionBehavior(.prefersToolbarItems)
                 .toolbarBackgroundVisibility(.hidden, for: .bottomBar)
                 .tabBarMinimizeBehavior(.never)
-            #else
-            content.toolbarVisibility(hidden ? .hidden : .visible, for: .tabBar)
-                .toolbarBackgroundVisibility(.hidden, for: .bottomBar)
-                .tabBarMinimizeBehavior(.never)
-            #endif
         } else { content }
+        #endif
     }
 }
 
@@ -137,7 +139,9 @@ struct DYVideoToolbarActions {
     var boost: DYBoostControl? = nil
 }
 
+#if !NO_IOS27_SDK
 @available(iOS 27.1, *)
+#endif
 struct DYNativeVideoActions: View {
     #if !NO_IOS27_SDK
     @Environment(\.toolbarVerticalEdge) private var verticalEdge

@@ -2877,8 +2877,12 @@ enum DDChromeMode: String, CaseIterable, Identifiable {
         raw == DDChromeMode.iphoneCompact.rawValue
     }
     static var availableCases: [Self] {
+        #if NO_IOS27_SDK
+        return allCases
+        #else
         if #available(iOS 27.1, *) { return allCases }
         return [.classic, .rail, .minimal]
+        #endif
     }
     var hidesInfo: Bool { self == .minimal }
 }
@@ -3023,7 +3027,12 @@ struct DYVideoPage: View {
 
     var body: some View {
         Group {
-            if #available(iOS 27.1, *), DDChromeMode.isClassicChrome(chromeModeRaw) {
+            #if NO_IOS27_SDK
+            let useClassic = DDChromeMode.isClassicChrome(chromeModeRaw)
+            #else
+            let useClassic: Bool = { if #available(iOS 27.1, *) { return DDChromeMode.isClassicChrome(chromeModeRaw) }; return false }()
+            #endif
+            if useClassic {
                 DYClassicVideoPage(item: item, isCurrent: isCurrent && !searchCoversVideo && !filterPresented, insets: insets, resume: resume,
                     liked: liked, collected: collected, onLike: onLike, onCollect: onCollect,
                     onDoubleTap: onDoubleTap, onComments: onComments, onAuthor: onAuthor,
@@ -3056,7 +3065,12 @@ struct DouyinFeedScreen: View {
     @StateObject private var shared = DYFeedShared()
     var body: some View {
         Group {
-            if #available(iOS 27.1, *), DDChromeMode.isClassicChrome(chromeModeRaw) {
+            #if NO_IOS27_SDK
+            let useClassic = DDChromeMode.isClassicChrome(chromeModeRaw)
+            #else
+            let useClassic: Bool = { if #available(iOS 27.1, *) { return DDChromeMode.isClassicChrome(chromeModeRaw) }; return false }()
+            #endif
+            if useClassic {
                 DYClassicFeedScreen(bridge: shared.bridge, feed: shared.feed)
             } else {
                 DYUpstreamFeedScreen(bridge: shared.bridge, feed: shared.feed)
@@ -3091,7 +3105,9 @@ extension EnvironmentValues {
     @Entry var dyStandaloneBackIdentifier = "douyin.list.back"
 }
 
+#if !NO_IOS27_SDK
 @available(iOS 27.1, *)
+#endif
 struct DYClassicFeedScreen: DYRecommendFeedHost {
     init(bridge: DouyinBridge, feed: DYFeedModel) {
         self.bridge = bridge
@@ -4502,7 +4518,9 @@ struct DYUpstreamVideoPage: View {
 
 }
 
+#if !NO_IOS27_SDK
 @available(iOS 27.1, *)
+#endif
 struct DYClassicVideoPage: View {
     @Environment(\.dyOfflineVideoPlayback) private var offlinePlayback
     private var usesOfflineFile: Bool { offlinePlayback?.inLibrary == true }
@@ -5087,8 +5105,12 @@ struct DYCommentPanel: View {
     @AppStorage(DDChromeMode.key) private var chromeModeRaw = DDChromeMode.classic.rawValue
     /// 评论面板四种界面统一用经典样式（老板 2026-11-17 定，外屏内屏都一样）。
     private var usesClassicComments: Bool {
+        #if NO_IOS27_SDK
+        return true
+        #else
         if #available(iOS 27.1, *) { return true }
         return false
+        #endif
     }
     let bridge: DouyinBridge
     let aweme: DYAweme

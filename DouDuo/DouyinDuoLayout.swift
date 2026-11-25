@@ -776,8 +776,12 @@ struct DYCommentPlayerLayout<Video: View>: View {
     @ViewBuilder var video: (EdgeInsets) -> Video
 
     private var usesClassicLayout: Bool {
+        #if NO_IOS27_SDK
+        return DDChromeMode.isClassicChrome(chromeModeRaw)
+        #else
         if #available(iOS 27.1, *) { return DDChromeMode.isClassicChrome(chromeModeRaw) }
         return false
+        #endif
     }
 
     private var commentItem: DYAweme? { allowsComments ? aweme ?? captionItem : nil }
@@ -865,6 +869,16 @@ struct DYCommentPlayerLayout<Video: View>: View {
             .frame(width: geo.size.width, height: geo.size.height, alignment: .topLeading)
             .background(Color.ddBackground.ignoresSafeArea())
             .overlayPreferenceValue(DYActiveVideoActionsKey.self) { actions in
+                #if NO_IOS27_SDK
+                if usesClassicLayout {
+                    DYNativeVideoActions(actions: showsComments || layout.showsPane ? nil : actions,
+                                         isClean: cleanScreen, onToggleClean: { cleanScreen.toggle() },
+                                         onBack: onBack, backIdentifier: backIdentifier)
+                        .id(horizontalCommentStatus || hidesCommentStatus)
+                        .frame(width: layout.videoSize.width)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                #else
                 if #available(iOS 27.1, *), usesClassicLayout {
                     DYNativeVideoActions(actions: showsComments || layout.showsPane ? nil : actions,
                                          isClean: cleanScreen, onToggleClean: { cleanScreen.toggle() },
@@ -873,6 +887,7 @@ struct DYCommentPlayerLayout<Video: View>: View {
                         .frame(width: layout.videoSize.width)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
+                #endif
             }
             .modifier(DYStandaloneBarPolicy(classic: usesClassicLayout))
             .onChange(of: layout.resident && layout.sideBySide, initial: true) { _, bookFold in
@@ -917,22 +932,26 @@ extension View {
 private struct DYStandaloneBarPolicy: ViewModifier {
     let classic: Bool
     @ViewBuilder func body(content: Content) -> some View {
+        #if NO_IOS27_SDK
+        if classic {
+            content.toolbarVisibility(.hidden, for: .tabBar)
+                .toolbarVisibility(.visible, for: .navigationBar)
+                .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
+                .toolbarColorScheme(.dark, for: .navigationBar, .bottomBar)
+        } else {
+            content.toolbar(.hidden, for: .navigationBar)
+        }
+        #else
         if #available(iOS 27.1, *), classic {
-            #if !NO_IOS27_SDK
             content.toolbarVisibility(.hidden, for: .tabBar)
                 .toolbarVisibility(.visible, for: .navigationBar)
                 .toolbarVerticalCompressionBehavior(.prefersToolbarItems)
                 .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
                 .toolbarColorScheme(.dark, for: .navigationBar, .bottomBar)
-            #else
-            content.toolbarVisibility(.hidden, for: .tabBar)
-                .toolbarVisibility(.visible, for: .navigationBar)
-                .toolbarBackgroundVisibility(.hidden, for: .navigationBar)
-                .toolbarColorScheme(.dark, for: .navigationBar, .bottomBar)
-            #endif
         } else {
             content.toolbar(.hidden, for: .navigationBar)
         }
+        #endif
     }
 }
 
@@ -975,6 +994,19 @@ struct DYHingeStateRoot: ViewModifier {
     @State private var compactWindow = false
 
     func body(content: Content) -> some View {
+        #if NO_IOS27_SDK
+        content
+            .environment(\.dyHingeClosed, closed)
+            .environment(\.dyStacksLandscapeComments,
+                         DDChromeMode.isCompactPhone(chromeModeRaw) && !DYDuoMetrics.isDuoHardware && compactWindow)
+            .environment(\.dyDuoLandscapeWindow, false)
+            .onGeometryChange(for: Bool.self) { geo in
+                let insets = geo.safeAreaInsets
+                let width = geo.size.width + insets.leading + insets.trailing
+                let height = geo.size.height + insets.top + insets.bottom
+                return width < DYDuoMetrics.legacyWideMin || width < height
+            } action: { compactWindow = $0 }
+        #else
         if #available(iOS 27.1, *) {
             content
                 .environment(\.dyHingeClosed, closed)
@@ -997,6 +1029,7 @@ struct DYHingeStateRoot: ViewModifier {
         } else {
             content
         }
+        #endif
     }
 }
 

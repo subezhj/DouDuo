@@ -3178,8 +3178,12 @@ struct DYEdgeSwipeBack: ViewModifier {
 struct DYForwardScreen: View {
     @AppStorage(DDChromeMode.key) private var mode = DDChromeMode.classic.rawValue
     private var usesClassicLayout: Bool {
+        #if NO_IOS27_SDK
+        return DDChromeMode.isClassicChrome(mode)
+        #else
         if #available(iOS 27.1, *) { return DDChromeMode.isClassicChrome(mode) }
         return false
+        #endif
     }
     let item: DYAweme
     var fromOfflineLibrary = false
