@@ -693,7 +693,9 @@ struct PlayerPage: View {
                     .accessibilityLabel("视频进度")
                     .accessibilityValue("\(Int(cur.isFinite ? cur : 0)) / \(Int(duration.isFinite ? duration : 0)) 秒")
                     .accessibilityIdentifier("douyin.progress")
-                    .padding(chromeInsets)
+                    .padding(chromeModeRaw == DDChromeMode.iphoneCompact.rawValue
+                             ? EdgeInsets(top: 0, leading: chromeInsets.leading, bottom: 0, trailing: 0)
+                             : chromeInsets)
                     .padding(.bottom, DYDuoMetrics.mediaBottomPadding(bottomInset))
                 }
             }

@@ -3221,7 +3221,7 @@ struct DYClassicFeedScreen: DYRecommendFeedHost {
         !showSearch && (residentComments || (supportsSidePanel && (authorTarget != nil || (showComments && !presentsLandscapeComments))))
     }
     private var hidesVideoChrome: Bool { (!showSearch && (showComments || residentComments || authorTarget != nil)) || liveRoomOpen }
-    private var innerPortrait: Bool { stacksLandscapeComments && !hingeClosed }
+    private var innerPortrait: Bool { DYDuoMetrics.isDuoHardware && stacksLandscapeComments && !hingeClosed }
     private var compactDuoHeader: Bool { hingeClosed || innerPortrait }
     private var anchorsHeaderToWindow: Bool { horizontalCommentStatus || compactDuoHeader }
 
@@ -3500,6 +3500,7 @@ struct DYClassicFeedScreen: DYRecommendFeedHost {
                 mainTab = .home
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { web = DYWebTarget(url: url) }
             }, forwardedShare: forwardedChat)
+            .toolbarVisibility(isCompactPhone ? .hidden : .automatic, for: .tabBar)
             .tint(nil)
         }
         .badge(noticeUnread)
@@ -3546,6 +3547,60 @@ struct DYClassicFeedScreen: DYRecommendFeedHost {
         }
     }
 
+    private var compactDockVisible: Bool {
+        guard isCompactPhone else { return false }
+        if mainTab == .home { return !hidesVideoChrome && !cleanScreen && !showSearch }
+        return true
+    }
+
+    private var compactBottomDock: some View {
+        HStack(spacing: 4) {
+            compactDockButton(tab: .home, icon: "house", activeIcon: "house.fill", label: "首页", badge: 0)
+            compactDockButton(tab: .messages, icon: "ellipsis.bubble", activeIcon: "ellipsis.bubble.fill", label: "消息", badge: noticeUnread)
+            compactDockButton(tab: .mine, icon: "person", activeIcon: "person.fill", label: "我的", badge: 0)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 5)
+        .glassEffect(.regular, in: .capsule)
+        .environment(\.colorScheme, .dark)
+        .padding(.bottom, max(DYDuoMetrics.windowBottomInset - 12, 16))
+        .ignoresSafeArea(.container, edges: .bottom)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("douyin.compactDock")
+    }
+
+    private func compactDockButton(tab target: DYMainTab, icon: String, activeIcon: String, label: String, badge: Int) -> some View {
+        let selected = mainTab == target
+        return Button {
+            if mainTab == target {
+                if target == .home { tapChannel(.recommend) }
+            } else {
+                withAnimation(.snappy(duration: 0.2)) { mainTab = target }
+            }
+        } label: {
+            ZStack(alignment: .topTrailing) {
+                Image(systemName: selected ? activeIcon : icon)
+                    .font(.system(size: 18, weight: selected ? .semibold : .regular))
+                    .foregroundStyle(selected ? Color.white : Color.white.opacity(0.62))
+                    .frame(width: 64, height: 36)
+                    .background {
+                        if selected {
+                            Capsule().fill(Color.white.opacity(0.16))
+                        }
+                    }
+                    .contentShape(Capsule())
+                if badge > 0 {
+                    Circle()
+                        .fill(theme.status.danger.color(for: .dark))
+                        .frame(width: 7, height: 7)
+                        .offset(x: -16, y: 6)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+    }
+
     private var systemTabs: some View {
         TabView(selection: Binding(get: { mainTab }, set: { mainTab = $0 })) {
             if isCompactPhone {
@@ -3558,6 +3613,13 @@ struct DYClassicFeedScreen: DYRecommendFeedHost {
                 homeTab
             }
         }
+        .overlay(alignment: .bottom) {
+            if compactDockVisible {
+                compactBottomDock
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
+        }
+        .animation(.snappy(duration: 0.2), value: compactDockVisible)
         .environment(\.dyForwardOpenChat, { receipt in
             forwardedChat = receipt
             mainTab = .messages
@@ -4569,8 +4631,8 @@ struct DYClassicVideoPage: View {
     }
     private var mediaBottomInset: CGFloat {
         if isCompactPhone, systemBars, verticalBarEdge == nil {
-            // 直板模式：把进度条与左下文案整体抬高到悬浮 3-Tab 胶囊上方
-            return max(insets.bottom, DYDuoMetrics.windowBottomInset + 56)
+            // 直板模式：进度条悬停在 46pt 紧凑底栏正上方（约 82pt 处），与底栏留出干净间距
+            return max(DYDuoMetrics.windowBottomInset, 28) + 58
         }
         // A vertical system toolbar already occupies the side column. After
         // rotation NavigationStack can retain its previous bottom-bar inset;
@@ -4729,7 +4791,7 @@ struct DYClassicVideoPage: View {
                 info(fg)
                     .padding(.horizontal, chromeSidePadding)
                     .padding(contentInsets)
-                    .padding(.bottom, DYDuoMetrics.mediaBottomPadding(mediaBottomInset) + (item.images.isEmpty ? 16 * ui : 16))
+                    .padding(.bottom, DYDuoMetrics.mediaBottomPadding(mediaBottomInset) + (isCompactPhone ? 22 : (item.images.isEmpty ? 16 * ui : 16)))
             }
         }
         .overlay(alignment: .trailing) {
@@ -4742,7 +4804,7 @@ struct DYClassicVideoPage: View {
                         let viewportBottom = viewport.frame(in: .global).maxY
                         let windowBottom = videoWindow?.bounds.maxY ?? viewportBottom
                         // Keep the rail beside the description and clear of the home dock.
-                        let dockLift: CGFloat = isCompactPhone ? 108 : 96
+                        let dockLift: CGFloat = isCompactPhone ? 98 : 96
                         let bottomPadding = max(0, viewportBottom - windowBottom + dockLift)
                         rail.frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                             .padding(.bottom, bottomPadding)

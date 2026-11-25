@@ -100,13 +100,19 @@ struct DYSystemTabBar: ViewModifier {
     @AppStorage(DDChromeMode.key) private var mode = DDChromeMode.classic.rawValue
     @ViewBuilder func body(content: Content) -> some View {
         #if NO_IOS27_SDK
-        if DDChromeMode.isClassicChrome(mode) {
+        if DDChromeMode.isCompactPhone(mode) {
+            content.toolbarVisibility(.hidden, for: .tabBar)
+                .toolbarBackgroundVisibility(.hidden, for: .bottomBar)
+        } else if DDChromeMode.isClassicChrome(mode) {
             content.toolbarVisibility(hidden ? .hidden : .visible, for: .tabBar)
                 .toolbarBackgroundVisibility(.hidden, for: .bottomBar)
                 .tabBarMinimizeBehavior(.never)
         } else { content }
         #else
-        if #available(iOS 27.1, *), DDChromeMode.isClassicChrome(mode) {
+        if #available(iOS 27.1, *), DDChromeMode.isCompactPhone(mode) {
+            content.toolbarVisibility(.hidden, for: .tabBar)
+                .toolbarBackgroundVisibility(.hidden, for: .bottomBar)
+        } else if #available(iOS 27.1, *), DDChromeMode.isClassicChrome(mode) {
             content.toolbarVisibility(hidden ? .hidden : .visible, for: .tabBar)
                 .toolbarVerticalCompressionBehavior(.prefersToolbarItems)
                 .toolbarBackgroundVisibility(.hidden, for: .bottomBar)
